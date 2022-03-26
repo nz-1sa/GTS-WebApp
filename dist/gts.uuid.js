@@ -33,8 +33,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.addTestUUIDs = exports.newUUID = void 0;
-const GTS = __importStar(require("./gts.webapp"));
+const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
+const Threading = __importStar(require("./gts.threading"));
+const WebApp = __importStar(require("./gts.webapp"));
 // make a unique identifier, it is a timestamp first uuid and includes the mac of the machine made on
 function newUUID() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -56,7 +58,7 @@ function newUUID() {
         let normalRand = Math.floor(Math.random() * 65535);
         const uuidD = GTS.HexUtils.encodeNumber(normalRand); // length 4
         // use the mac address to reduce conflicts between machines
-        const mac = GTS.getServerMAC();
+        const mac = WebApp.getServerMAC();
         const uuidE = mac.split(':').join(''); // length 12
         // return a uuid as a string joined from the above parts,	lengths: 8-4-4-4-12
         return `${uuidA}-${uuidB}-${uuidC}-${uuidD}-${uuidE}`;
@@ -75,12 +77,12 @@ function addTestUUIDs(sessionUUID) {
     return __awaiter(this, void 0, void 0, function* () {
         let fetchBatch = yield DB.getNewBatchNum(sessionUUID);
         if (fetchBatch.error || fetchBatch.data == null) {
-            return new GTS.WrappedResult().setError('Unable to get batch number\r\n' + fetchBatch.message);
+            return new GTS.DM.WrappedResult().setError('Unable to get batch number\r\n' + fetchBatch.message);
         }
         for (var i = 0; i < 100; i++) {
             yield DB.addTestUUID(yield newUUID(), fetchBatch.data, sessionUUID);
         }
-        return new GTS.WrappedResult().setData(true);
+        return new GTS.DM.WrappedResult().setData(true);
     });
 }
 exports.addTestUUIDs = addTestUUIDs;
@@ -88,7 +90,7 @@ exports.addTestUUIDs = addTestUUIDs;
 function randomDelay() {
     return __awaiter(this, void 0, void 0, function* () {
         var startTime = new Date().getTime();
-        yield GTS.delay(10);
+        yield Threading.pause(10);
         var endTime = new Date().getTime();
         return (endTime - startTime);
     });
@@ -124,14 +126,14 @@ var DB;
         return __awaiter(this, void 0, void 0, function* () {
             let fetchConn = yield DBCore.getConnection('getDecimals', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let client = fetchConn.data;
             const res = yield client.query('CALL getTestUUIDBatchNum(0);');
             if (res.rowCount == 0) {
-                return new GTS.WrappedResult().setData(-1);
+                return new GTS.DM.WrappedResult().setData(-1);
             }
-            return new GTS.WrappedResult().setData(res.rows[0].num);
+            return new GTS.DM.WrappedResult().setData(res.rows[0].num);
         });
     }
     DB.getNewBatchNum = getNewBatchNum;
@@ -139,12 +141,12 @@ var DB;
         return __awaiter(this, void 0, void 0, function* () {
             let fetchConn = yield DBCore.getConnection('addTestUUID', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let parts = testUUID.split('-');
             let client = fetchConn.data;
             yield client.query('CALL addTestUUID($1,$2,$3,$4,$5,$6);', [batchNum, parts[0], parts[1], parts[2], parts[3], parts[4]]);
-            return new GTS.WrappedResult().setNoData();
+            return new GTS.DM.WrappedResult().setNoData();
         });
     }
     DB.addTestUUID = addTestUUID;

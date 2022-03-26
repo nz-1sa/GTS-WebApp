@@ -33,7 +33,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DB = exports.Weblog = exports.WebResponse = exports.WebServerHelper = void 0;
-const GTS = __importStar(require("./gts.webapp"));
+const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
 const PATH = require('path');
@@ -190,89 +190,89 @@ class WebServerHelper {
     requireTransactionHash(req, res) {
         if (typeof (req.query.txHash) === undefined) {
             res.send(new WebResponse(false, 'Missing txHash param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let txHash = req.query.txHash.toString();
         if (txHash && txHash.length == 64 && GTS.HexUtils.checkStringIsHexEncoded(txHash)) {
-            return new GTS.CheckedValue(true, txHash);
+            return new GTS.DM.CheckedValue(true, txHash);
         }
         else {
             res.send(new WebResponse(false, 'Invalid transaction hash param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
     // check that a network is sent for the request
     requireNetwork(req, res) {
         if (typeof (req.query.network) === undefined) {
             res.send(new WebResponse(false, 'Missing network param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let network = req.query.network.toString();
         if (network && (network == 'M' || network == 'T' || network == 'D')) {
-            return new GTS.CheckedValue(true, network);
+            return new GTS.DM.CheckedValue(true, network);
         }
         else {
             res.send(new WebResponse(false, 'Invalid network param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
     // check that a bech32 address is sent for the request
     requireBech32Address(req, res) {
         if (typeof (req.query.address) === undefined) {
             res.send(new WebResponse(false, 'Missing address param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let address = req.query.address.toString();
         if (address && GTS.AddressUtils.checkAddressStringIsBech32(address)) {
-            return new GTS.CheckedValue(true, address);
+            return new GTS.DM.CheckedValue(true, address);
         }
         else {
             res.send(new WebResponse(false, 'Invalid address param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
     // check that hex is sent for the request
     requireHex(req, res) {
         if (typeof (req.query.hex) === undefined) {
             res.send(new WebResponse(false, 'Missing hex param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let hex = req.query.hex.toString();
         if (hex && GTS.HexUtils.checkStringIsHexEncodedList(hex)) {
-            return new GTS.CheckedValue(true, hex);
+            return new GTS.DM.CheckedValue(true, hex);
         }
         else {
             res.send(new WebResponse(false, 'Invalid hex param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
     // check that data is sent for the request
     requireData(req, res) {
         if (typeof (req.query.data) === undefined) {
             res.send(new WebResponse(false, 'Missing data param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let data = req.query.data.toString();
         if (GTS.HexUtils.checkStringIsHexEncodedList(data)) {
-            return new GTS.CheckedValue(true, data);
+            return new GTS.DM.CheckedValue(true, data);
         }
         else {
             res.send(new WebResponse(false, 'Invalid data param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
     requireId(req, res) {
         if (typeof (req.query.id) === undefined) {
             res.send(new WebResponse(false, 'Missing id param', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
         let id = req.query.id.toString();
         if (GTS.StringUtils.checkStringIsInteger(id)) {
-            return new GTS.CheckedValue(true, id);
+            return new GTS.DM.CheckedValue(true, id);
         }
         else {
             res.send(new WebResponse(false, 'Invalid id param received', '', '').toString());
-            return new GTS.CheckedValue(false, '');
+            return new GTS.DM.CheckedValue(false, '');
         }
     }
 }
@@ -327,11 +327,11 @@ var DB;
         return __awaiter(this, void 0, void 0, function* () {
             let fetchConn = yield DBCore.getConnection('addWebLog', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let client = fetchConn.data;
             yield client.query('CALL addWebLog($1,$2,$3,$4,$5,$6,$7);', [uuid, requestUrl, requestParams, responseSuccess, responseDuration, logMessage, errorMessage]);
-            return new GTS.WrappedResult().setNoData();
+            return new GTS.DM.WrappedResult().setNoData();
         });
     }
     DB.addWeblog = addWeblog;
@@ -341,7 +341,7 @@ var DB;
             let retvalData = [];
             let fetchConn = yield DBCore.getConnection('getWeblogs', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let client = fetchConn.data;
             const res = yield client.query('SELECT id, uuid, requestedat, requesturl, requestparams, responsesuccess, responseduration, logmessage, errormessage FROM WebLogs ORDER BY id ASC;');
@@ -358,7 +358,7 @@ var DB;
                 l.errorMessage = res.rows[i].errormessage;
                 retvalData.push(l);
             }
-            return new GTS.WrappedResult().setData(retvalData);
+            return new GTS.DM.WrappedResult().setData(retvalData);
         });
     }
     DB.getWeblogs = getWeblogs;
@@ -367,14 +367,14 @@ var DB;
             try {
                 let fetchConn = yield DBCore.getConnection('pruneWeblogs', uuid);
                 if (fetchConn.error || fetchConn.data == null) {
-                    return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                    return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
                 }
                 let client = fetchConn.data;
                 yield client.query('DELETE FROM WebLogs WHERE id <= $1;', [id]);
-                return new GTS.WrappedResult().setNoData();
+                return new GTS.DM.WrappedResult().setNoData();
             }
             catch (err) {
-                return new GTS.WrappedResult().setError(err.toString());
+                return new GTS.DM.WrappedResult().setError(err.toString());
             }
         });
     }

@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.releaseConnection = exports.getConnection = exports.hasConnection = exports.ClientPool = void 0;
-const GTS = __importStar(require("./gts.webapp"));
+const GTS = __importStar(require("./gts"));
 const Threading = __importStar(require("./gts.threading"));
 const pg_1 = __importDefault(require("pg"));
 const dbConn = process.env.DATABASE_URL;
@@ -70,7 +70,7 @@ exports.hasConnection = hasConnection;
 function getConnection(purpose, uuid) {
     return __awaiter(this, void 0, void 0, function* () {
         //console.log(`UUID:${uuid} getting db connection, ${Object.keys(clientPool).length-2} already open, ${clientPool.connections.length} half closed`);
-        let retval = new GTS.WrappedResult();
+        let retval = new GTS.DM.WrappedResult();
         //console.log(`Looking for ${uuid} in ${Object.keys(clientPool)}`);
         let dbConnStart = new Date().getTime();
         let client = clientPool.openConnections[uuid]; // first try to get existing client for the request
@@ -85,26 +85,26 @@ function getConnection(purpose, uuid) {
                 let c = clientPool.openConnections[uuid]; // first try to get existing client for the request
                 if (c) {
                     //console.log(`UUID:${uuid} existing db connection got after OneAtATime delay for ${purpose}`);
-                    return new GTS.WrappedResult().setData(c);
+                    return new GTS.DM.WrappedResult().setData(c);
                 }
                 let testC = clientPool.connections.pop(); // next try to get a recently finished connection
                 if (testC) {
                     clientPool.openConnections[uuid] = testC; // store the client for future connections in the request
                     //console.log(`UUID:${uuid} db connection recycled for ${purpose}`);
-                    return new GTS.WrappedResult().setData(testC);
+                    return new GTS.DM.WrappedResult().setData(testC);
                 }
                 try {
                     c = yield pool.connect(); // next request a client from pg Pool
                 }
                 catch (err) {
                     console.error(`${Date.now()} error connecting to pool`);
-                    return new GTS.WrappedResult().setError('error connecting to db\r\n' + err);
+                    return new GTS.DM.WrappedResult().setError('error connecting to db\r\n' + err);
                 }
                 if (c) {
                     clientPool.openConnections[uuid] = c; // store the client for future connections in the request
                     let dbConnDone = new Date().getTime();
                     //console.log(`UUID:${uuid} db connection opened in ${(dbConnDone-dbConnStart)/1000}s for ${purpose}`);
-                    return new GTS.WrappedResult().setData(c);
+                    return new GTS.DM.WrappedResult().setData(c);
                 }
                 console.log(`${Date.now()} connection not got`);
             });

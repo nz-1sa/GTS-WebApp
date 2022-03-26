@@ -32,14 +32,45 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = void 0;
-const GTS = __importStar(require("./gts.webapp"));
+exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.delayCancellable = exports.CancellableDelay = exports.pause = void 0;
+const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
 const PATH = require('path');
+const doLogging = false; // if thread debug logging is being recorded
 let threadingLogId = 0; // incrementing ids for sequencing of log entries
 const threadingLogGroup = new Date().getTime(); // single server, the id is in groups of when the file loaded
-const doLogging = false;
+// introduce a delay in code by allowing await for a setTimeout
+function pause(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+exports.pause = pause;
+// holds a promise to wait for, and the ability to cancel the delay the promise is waiting for
+class CancellableDelay {
+    constructor(pTimeout, pPromise) {
+        this.timeout = pTimeout;
+        this.promise = pPromise;
+    }
+}
+exports.CancellableDelay = CancellableDelay;
+// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
+function delayCancellable(ms) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // ability to cancel the timeout, init to a dummy value to allow code to compile
+        var delayTimeout = setTimeout(() => null, 1);
+        // the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
+        var delayPromise = Promise.resolve();
+        // set the real values for delayTimeout and delayPromise
+        var promiseTimeoutSet = new Promise(function (resolveTimeoutSet, rejectTimeoutSet) {
+            delayPromise = new Promise(function (resolve, reject) { delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet(); });
+        });
+        // wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
+        yield promiseTimeoutSet;
+        // return the results
+        return new CancellableDelay(delayTimeout, delayPromise);
+    });
+}
+exports.delayCancellable = delayCancellable;
 let doOnceStatus = {};
 let doOnceWaiting = {};
 function multiThreadDoOnce(purpose, uuid, action) {
@@ -288,7 +319,7 @@ function throttle(uuid, purpose, delay, action, doLog) {
                                         yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'Throttle', purpose, `enforced delay of ${delay - delayDone}`), uuid);
                                     }
                                     //console.log(`Throttle delaying ${delay-delayDone}`);
-                                    yield GTS.delay(delay - delayDone);
+                                    yield pause(delay - delayDone);
                                     //console.log('Throttle delay done');
                                 }
                                 //console.log('qued job being processed');
@@ -344,7 +375,7 @@ function throttle(uuid, purpose, delay, action, doLog) {
                 yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'Throttle', purpose, `enforced delay of ${delay - delayDoneFirst}`), uuid);
             }
             //console.log(`Throttle delaying ${delay-delayDoneFirst}`);
-            yield GTS.delay(delay - delayDoneFirst);
+            yield pause(delay - delayDoneFirst);
             //console.log('Throttle delay done');
         }
         //console.log('start processing job');
@@ -401,9 +432,9 @@ function doWithTimeout(uuid, timeout, action) {
         return p;
         function limitTime(uuid, timeout) {
             return __awaiter(this, void 0, void 0, function* () {
-                let delay = yield GTS.delayCancellable(timeout);
-                ourTimeout = delay.delayTimeout;
-                yield delay.p;
+                let delay = yield delayCancellable(timeout);
+                ourTimeout = delay.timeout;
+                yield delay.promise;
                 if (!funcOver) {
                     funcOver = true;
                     console.log('timeout finished first');
@@ -486,7 +517,7 @@ function attachThreadingDebugInterface(web, webapp) {
                 return __awaiter(this, void 0, void 0, function* () {
                     yield singleLock('testing', uuid, function (uuidCallback) {
                         return __awaiter(this, void 0, void 0, function* () {
-                            yield GTS.delay(1000);
+                            yield pause(1000);
                             return true;
                         });
                     });
@@ -498,18 +529,18 @@ function attachThreadingDebugInterface(web, webapp) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 let jobs = [function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(2000); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(2000); });
                     }, function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(1900); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(1900); });
                     }, function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(1800); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(1800); });
                     },
                     function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(2000); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(2000); });
                     }, function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(1900); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(1900); });
                     }, function () {
-                        return __awaiter(this, void 0, void 0, function* () { yield GTS.delay(1800); });
+                        return __awaiter(this, void 0, void 0, function* () { yield pause(1800); });
                     }];
                 yield doAllAsync(jobs, uuid, 'Testing /DoAllAsync');
                 return new WS.WebResponse(true, '', 'Done DoAllAsync Test', '<a href="./threadinglogs">View Logs</a>');
@@ -576,11 +607,11 @@ var DB;
         return __awaiter(this, void 0, void 0, function* () {
             let fetchConn = yield DBCore.getConnection('addThreadingLog', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let client = fetchConn.data;
             yield client.query('CALL addThreadingLog($1,$2,$3,$4,$5,$6,$7);', [log.threadingId, log.threadingGroup, log.uuid, log.type, log.purpose, log.action, log.loggedAt]);
-            return new GTS.WrappedResult().setNoData();
+            return new GTS.DM.WrappedResult().setNoData();
         });
     }
     DB.addThreadingLog = addThreadingLog;
@@ -590,7 +621,7 @@ var DB;
             let retvalData = [];
             let fetchConn = yield DBCore.getConnection('getWeblogs', uuid);
             if (fetchConn.error || fetchConn.data == null) {
-                return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
             }
             let client = fetchConn.data;
             const res = yield client.query('SELECT id, threadingid, threadinggroup, uuid, type, purpose, action, loggedat FROM ThreadingLogs ORDER BY loggedat ASC, threadingid ASC;');
@@ -598,7 +629,7 @@ var DB;
                 let l = new ThreadingLog().setVals(res.rows[i].id, res.rows[i].threadingid, res.rows[i].threadinggroup, res.rows[i].uuid, res.rows[i].type, res.rows[i].purpose, res.rows[i].action, res.rows[i].loggedat);
                 retvalData.push(l);
             }
-            return new GTS.WrappedResult().setData(retvalData);
+            return new GTS.DM.WrappedResult().setData(retvalData);
         });
     }
     DB.getThreadingLogs = getThreadingLogs;
@@ -607,14 +638,14 @@ var DB;
             try {
                 let fetchConn = yield DBCore.getConnection('pruneThreadinglogs', uuid);
                 if (fetchConn.error || fetchConn.data == null) {
-                    return new GTS.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
+                    return new GTS.DM.WrappedResult().setError('DB Connection error\r\n' + fetchConn.message);
                 }
                 let client = fetchConn.data;
                 yield client.query('DELETE FROM ThreadingLogs WHERE id <= $1;', [id]);
-                return new GTS.WrappedResult().setNoData();
+                return new GTS.DM.WrappedResult().setNoData();
             }
             catch (err) {
-                return new GTS.WrappedResult().setError(err.toString());
+                return new GTS.DM.WrappedResult().setError(err.toString());
             }
         });
     }

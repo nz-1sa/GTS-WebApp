@@ -1,6 +1,14 @@
-import * as GTS from "./gts.webapp";
+/// <reference types="node" />
+import * as GTS from "./gts";
 import * as WS from "./gts.webserver";
 import Express from 'express';
+export declare function pause(ms: number): Promise<void>;
+export declare class CancellableDelay {
+    timeout: NodeJS.Timeout;
+    promise: Promise<void>;
+    constructor(pTimeout: NodeJS.Timeout, pPromise: Promise<void>);
+}
+export declare function delayCancellable(ms: number): Promise<CancellableDelay>;
 export declare function multiThreadDoOnce<T>(purpose: string, uuid: string, action: Function): Promise<T>;
 export declare function doAllAsync(jobs: Function[], uuid: string, purpose: string): Promise<void>;
 export declare function singleLock<T>(purpose: string, uuid: string, action: Function, doLog?: boolean): Promise<T>;
@@ -21,7 +29,7 @@ export declare class ThreadingLog {
     setNew(pThreadingId: number, pThreadingGroup: number, pUuid: string, pType: string, pPurpose: string, pAction: string): ThreadingLog;
 }
 export declare namespace DB {
-    function addThreadingLog(log: ThreadingLog, uuid: string): Promise<GTS.WrappedResult<void>>;
-    function getThreadingLogs(uuid: string): Promise<GTS.WrappedResult<ThreadingLog[]>>;
-    function pruneThreadinglogs(uuid: string, id: string): Promise<GTS.WrappedResult<void>>;
+    function addThreadingLog(log: ThreadingLog, uuid: string): Promise<GTS.DM.WrappedResult<void>>;
+    function getThreadingLogs(uuid: string): Promise<GTS.DM.WrappedResult<ThreadingLog[]>>;
+    function pruneThreadinglogs(uuid: string, id: string): Promise<GTS.DM.WrappedResult<void>>;
 }
