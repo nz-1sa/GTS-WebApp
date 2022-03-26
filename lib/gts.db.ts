@@ -1,4 +1,4 @@
-import * as GTS from "./gts.webapp";
+import * as GTS from "./gts";
 import * as Threading from "./gts.threading";
 import Pg from 'pg';
 
@@ -15,7 +15,7 @@ const pool:Pg.Pool = new Pg.Pool({
 export class ClientPool{
 	connections: Pg.PoolClient[] = [];
 	delayedRelease: NodeJS.Timeout|null = null;
-	openConnections: GTS.HashTable<Pg.PoolClient> = {};
+	openConnections: GTS.DM.HashTable<Pg.PoolClient> = {};
 }
 
 // multi-threaded requests for db connections
@@ -27,9 +27,9 @@ export function hasConnection(uuid:string):boolean{
 }
 
 // get an available existing connection, or open a new one
-export async function getConnection(purpose: string, uuid: string): Promise<GTS.WrappedResult<Pg.PoolClient>>{
+export async function getConnection(purpose: string, uuid: string): Promise<GTS.DM.WrappedResult<Pg.PoolClient>>{
 	//console.log(`UUID:${uuid} getting db connection, ${Object.keys(clientPool).length-2} already open, ${clientPool.connections.length} half closed`);
-	let retval:GTS.WrappedResult<Pg.PoolClient> = new GTS.WrappedResult();
+	let retval:GTS.DM.WrappedResult<Pg.PoolClient> = new GTS.DM.WrappedResult();
 	//console.log(`Looking for ${uuid} in ${Object.keys(clientPool)}`);
 	let dbConnStart = new Date().getTime();
 	let client:Pg.PoolClient = clientPool.openConnections[uuid];		// first try to get existing client for the request
@@ -38,30 +38,30 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 		retval.setData(client);
 		return retval;								// make the client connection available to the caller
 	}
-	let fr:GTS.WrappedResult<Pg.PoolClient> = await Threading.singleLock<GTS.WrappedResult<Pg.PoolClient>>('openDbConnection',uuid, async function(uuid:string){
+	let fr:GTS.DM.WrappedResult<Pg.PoolClient> = await Threading.singleLock<GTS.DM.WrappedResult<Pg.PoolClient>>('openDbConnection',uuid, async function(uuid:string){
 		//console.log(`UUID:${uuid} entered single lock`);
 		let c:Pg.PoolClient = clientPool.openConnections[uuid];	// first try to get existing client for the request
 		if(c){
 			//console.log(`UUID:${uuid} existing db connection got after OneAtATime delay for ${purpose}`);
-			return new GTS.WrappedResult().setData(c);
+			return new GTS.DM.WrappedResult().setData(c);
 		}
 		let testC:Pg.PoolClient|undefined = clientPool.connections.pop();	// next try to get a recently finished connection
 		if(testC){
 			clientPool.openConnections[uuid] = testC!;					// store the client for future connections in the request
 			//console.log(`UUID:${uuid} db connection recycled for ${purpose}`);
-			return new GTS.WrappedResult().setData(testC!);
+			return new GTS.DM.WrappedResult().setData(testC!);
 		}
 		try{
 			c = await pool.connect();			// next request a client from pg Pool
 		} catch(err) {
 			console.error(`${Date.now()} error connecting to pool`);
-			return new GTS.WrappedResult().setError('error connecting to db\r\n'+err);
+			return new GTS.DM.WrappedResult().setError('error connecting to db\r\n'+err);
 		}
 		if(c){
 			clientPool.openConnections[uuid] = c;					// store the client for future connections in the request
 			let dbConnDone = new Date().getTime();
 			//console.log(`UUID:${uuid} db connection opened in ${(dbConnDone-dbConnStart)/1000}s for ${purpose}`);
-			return new GTS.WrappedResult().setData(c);
+			return new GTS.DM.WrappedResult().setData(c);
 		}
 		console.log(`${Date.now()} connection not got`);
 	},false);	//don't log the threading used to open a db connection, so as not enter a recursive loop;   log -> connect to db -> log -> connect to db -> ...

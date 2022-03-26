@@ -1,16 +1,48 @@
-import * as GTS from "./gts.webapp";
+import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
 import * as WS from "./gts.webserver";
 import Express from 'express';
 const PATH = require('path');
 
-let threadingLogId:number = 0;		// incrementing ids for sequencing of log entries
+const doLogging:boolean = false;												// if thread debug logging is being recorded
+let threadingLogId:number = 0;													// incrementing ids for sequencing of log entries
 const threadingLogGroup:number = new Date().getTime();		// single server, the id is in groups of when the file loaded
 
-const doLogging:boolean = false;
 
-let doOnceStatus:GTS.HashTable<number> = {};
-let doOnceWaiting:GTS.HashTable<DoOnceWaitingJob[]> = {};
+
+// introduce a delay in code by allowing await for a setTimeout
+export function pause(ms:number):Promise<void>{
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// holds a promise to wait for, and the ability to cancel the delay the promise is waiting for
+export class CancellableDelay{
+	timeout:NodeJS.Timeout;	// the timeout from a setTimeout (clear to cancel)
+	promise:Promise<void>;	// the promise that is resolved the the setTimout finishes
+	constructor(pTimeout:NodeJS.Timeout, pPromise:Promise<void>){
+		this.timeout = pTimeout;
+		this.promise = pPromise;
+	}
+}
+
+// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
+export async function delayCancellable(ms:number):Promise<CancellableDelay>{
+	// ability to cancel the timeout, init to a dummy value to allow code to compile
+	var delayTimeout:NodeJS.Timeout = setTimeout(()=>null,1);
+	// the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
+	var delayPromise:Promise<void> = Promise.resolve();
+	// set the real values for delayTimeout and delayPromise
+	var promiseTimeoutSet:Promise<void> = new Promise(function(resolveTimeoutSet:Function, rejectTimeoutSet:Function){
+		delayPromise = new Promise(function(resolve, reject){delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet();});
+	});
+	// wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
+	await promiseTimeoutSet;
+	// return the results
+	return new CancellableDelay(delayTimeout, delayPromise);	
+}
+
+let doOnceStatus:GTS.DM.HashTable<number> = {};
+let doOnceWaiting:GTS.DM.HashTable<DoOnceWaitingJob[]> = {};
 export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:Function):Promise<T>{
 	if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'entered function'),uuid);}
 	let jobStatus:number = doOnceStatus[purpose]?doOnceStatus[purpose]:0;
@@ -79,8 +111,8 @@ export async function doAllAsync( jobs:Function[] , uuid:string, purpose:string)
 	}
 }
 
-let singleLockStatus:GTS.HashTable<boolean> = {};
-let singleLockWaiting:GTS.HashTable<SingleLockWaitingJob[]> = {};
+let singleLockStatus:GTS.DM.HashTable<boolean> = {};
+let singleLockWaiting:GTS.DM.HashTable<SingleLockWaitingJob[]> = {};
 // Que jobs doing each on in turn in the order they arrive
 export async function singleLock<T>(purpose:string, uuid:string, action:Function, doLog?:boolean):Promise<T>{
 	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
@@ -151,9 +183,9 @@ export async function singleLock<T>(purpose:string, uuid:string, action:Function
 	return jobValueFirst;
 }
 
-let throttleStatus:GTS.HashTable<boolean> = {};
-let throttleWaiting:GTS.HashTable<SingleLockWaitingJob[]> = {};
-let throttleLastDone:GTS.HashTable<number> = {};
+let throttleStatus:GTS.DM.HashTable<boolean> = {};
+let throttleWaiting:GTS.DM.HashTable<SingleLockWaitingJob[]> = {};
+let throttleLastDone:GTS.DM.HashTable<number> = {};
 // Que jobs doing each on in turn in the order they arrive, with a delay between jobs
 export async function throttle<T>(uuid:string, purpose:string, delay:number, action:Function, doLog?:boolean):Promise<T>{
 	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
@@ -178,7 +210,7 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 				if(delayDone < delay){
 					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,`enforced delay of ${delay-delayDone}`),uuid);}
 					//console.log(`Throttle delaying ${delay-delayDone}`);
-					await GTS.delay(delay-delayDone);
+					await pause(delay-delayDone);
 					//console.log('Throttle delay done');
 				}
 				//console.log('qued job being processed');
@@ -217,7 +249,7 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 	if(delayDoneFirst < delay){
 		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,`enforced delay of ${delay-delayDoneFirst}`),uuid);}
 		//console.log(`Throttle delaying ${delay-delayDoneFirst}`);
-		await GTS.delay(delay-delayDoneFirst);
+		await pause(delay-delayDoneFirst);
 		//console.log('Throttle delay done');
 	}
 	//console.log('start processing job');
@@ -261,9 +293,9 @@ export async function doWithTimeout<T>(uuid:string, timeout:number, action:Funct
 	return p;
 	
 	async function limitTime(uuid:string, timeout:number){
-		let delay:GTS.CancellableDelay = await GTS.delayCancellable(timeout);
-		ourTimeout = delay.delayTimeout;
-		await delay.p;
+		let delay:CancellableDelay = await delayCancellable(timeout);
+		ourTimeout = delay.timeout;
+		await delay.promise;
 		if(!funcOver){
 			funcOver = true;
 			console.log('timeout finished first');
@@ -295,7 +327,7 @@ export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Exp
 	webapp.get('/threadinglogs', (req:Express.Request, res:Express.Response) => res.sendFile(PATH.join(__dirname, '../threadinglogs.html')));
 	web.registerHandler(webapp, '/req/threadinglogs', [], async function(uuid:string){
 		try{
-			let getLogs:GTS.WrappedResult<ThreadingLog[]> = await DB.getThreadingLogs(uuid);
+			let getLogs:GTS.DM.WrappedResult<ThreadingLog[]> = await DB.getThreadingLogs(uuid);
 			if(getLogs.error){
 				return new WS.WebResponse(false,'Error fetching threading logs\r\n'+getLogs.message,'Error fetching threading logs','');
 			}
@@ -305,8 +337,8 @@ export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Exp
 			return new WS.WebResponse(false,'Error fetching threading logs\r\n'+err,'Error fetching threading logs','');
 		}
 	});
-	web.registerHandler(webapp, '/req/prune-threadinglogs', ['id'], async function(uuid:string, idCheck:GTS.CheckedValue<string>){
-		let result:GTS.WrappedResult<void> = await DB.pruneThreadinglogs(uuid, idCheck.value);
+	web.registerHandler(webapp, '/req/prune-threadinglogs', ['id'], async function(uuid:string, idCheck:GTS.DM.CheckedValue<string>){
+		let result:GTS.DM.WrappedResult<void> = await DB.pruneThreadinglogs(uuid, idCheck.value);
 		if(result.error){
 			return new WS.WebResponse(false, result.message, 'Failed to prune Threadinglogs','');
 		} else {
@@ -326,7 +358,7 @@ export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Exp
 		
 		async function doTest(uuid:string){
 			await singleLock<boolean>('testing',uuid, async function(uuidCallback:string){
-				await GTS.delay(1000);
+				await pause(1000);
 				return true;
 			});
 		}
@@ -335,8 +367,8 @@ export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Exp
 
 	web.registerHandler(webapp, '/DoAllAsync', [], async function(uuid:string){
 		try{
-			let jobs:Function[] = [ async function(){await GTS.delay(2000);}, async function(){await GTS.delay(1900);}, async function(){await GTS.delay(1800);},
-												async function(){await GTS.delay(2000);}, async function(){await GTS.delay(1900);}, async function(){await GTS.delay(1800);} ];
+			let jobs:Function[] = [ async function(){await pause(2000);}, async function(){await pause(1900);}, async function(){await pause(1800);},
+												async function(){await pause(2000);}, async function(){await pause(1900);}, async function(){await pause(1800);} ];
 			await doAllAsync(jobs, uuid, 'Testing /DoAllAsync');			
 			return new WS.WebResponse(true, '', 'Done DoAllAsync Test','<a href="./threadinglogs">View Logs</a>');													
 		} catch(err) {
@@ -413,22 +445,22 @@ export class ThreadingLog{
 }
 
 export namespace DB{
-	export async function addThreadingLog(log:ThreadingLog, uuid:string): Promise<GTS.WrappedResult<void>>{
-		let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('addThreadingLog', uuid);
+	export async function addThreadingLog(log:ThreadingLog, uuid:string): Promise<GTS.DM.WrappedResult<void>>{
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('addThreadingLog', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let client:DBCore.Client = fetchConn.data!;
 		await client.query('CALL addThreadingLog($1,$2,$3,$4,$5,$6,$7);',[log.threadingId, log.threadingGroup, log.uuid, log.type, log.purpose, log.action, log.loggedAt]);
-		return new GTS.WrappedResult<void>().setNoData();
+		return new GTS.DM.WrappedResult<void>().setNoData();
 	}
 
 	// view all threading logs recorded
-	export async function getThreadingLogs(uuid:string): Promise<GTS.WrappedResult<ThreadingLog[]>>{
+	export async function getThreadingLogs(uuid:string): Promise<GTS.DM.WrappedResult<ThreadingLog[]>>{
 		let retvalData: ThreadingLog[] = [];
-		let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('getWeblogs', uuid);
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('getWeblogs', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<ThreadingLog[]>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<ThreadingLog[]>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let client:DBCore.Client = fetchConn.data!;
 		const res = await client.query('SELECT id, threadingid, threadinggroup, uuid, type, purpose, action, loggedat FROM ThreadingLogs ORDER BY loggedat ASC, threadingid ASC;');
@@ -436,20 +468,20 @@ export namespace DB{
 			let l:ThreadingLog = new ThreadingLog().setVals(res.rows[i].id, res.rows[i].threadingid, res.rows[i].threadinggroup, res.rows[i].uuid, res.rows[i].type, res.rows[i].purpose, res.rows[i].action, res.rows[i].loggedat);
 			retvalData.push(l);
 		}
-		return new GTS.WrappedResult<ThreadingLog[]>().setData(retvalData);
+		return new GTS.DM.WrappedResult<ThreadingLog[]>().setData(retvalData);
 	}
 	
-	export async function pruneThreadinglogs(uuid:string, id:string): Promise<GTS.WrappedResult<void>>{
+	export async function pruneThreadinglogs(uuid:string, id:string): Promise<GTS.DM.WrappedResult<void>>{
 		try{
-			let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('pruneThreadinglogs', uuid);
+			let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('pruneThreadinglogs', uuid);
 			if(fetchConn.error || fetchConn.data == null){
-				return new GTS.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
+				return new GTS.DM.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
 			}
 			let client:DBCore.Client = fetchConn.data!;
 			await client.query('DELETE FROM ThreadingLogs WHERE id <= $1;', [id]);
-			return new GTS.WrappedResult<void>().setNoData();
+			return new GTS.DM.WrappedResult<void>().setNoData();
 		}catch( err:any ){
-			return new GTS.WrappedResult<void>().setError(err.toString());
+			return new GTS.DM.WrappedResult<void>().setError(err.toString());
 		}
 	}
 }

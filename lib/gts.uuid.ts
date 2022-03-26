@@ -1,5 +1,7 @@
-import * as GTS from "./gts.webapp";
+import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
+import * as Threading from './gts.threading';
+import *  as WebApp from './gts.webapp';
 
 // make a unique identifier, it is a timestamp first uuid and includes the mac of the machine made on
 export async function newUUID(): Promise<string>{
@@ -25,7 +27,7 @@ export async function newUUID(): Promise<string>{
 	const uuidD:string = GTS.HexUtils.encodeNumber(normalRand);	// length 4
 	
 	// use the mac address to reduce conflicts between machines
-	const mac = GTS.getServerMAC();
+	const mac = WebApp.getServerMAC();
 	const uuidE = mac.split(':').join('');		// length 12
 
 	// return a uuid as a string joined from the above parts,	lengths: 8-4-4-4-12
@@ -41,21 +43,21 @@ export async function newUUID(): Promise<string>{
 	}
 }
 
-export async function addTestUUIDs(sessionUUID:string):Promise<GTS.WrappedResult<boolean>>{
-	let fetchBatch:GTS.WrappedResult<number> = await DB.getNewBatchNum(sessionUUID);
+export async function addTestUUIDs(sessionUUID:string):Promise<GTS.DM.WrappedResult<boolean>>{
+	let fetchBatch:GTS.DM.WrappedResult<number> = await DB.getNewBatchNum(sessionUUID);
 	if(fetchBatch.error || fetchBatch.data == null){
-		return new GTS.WrappedResult<boolean>().setError('Unable to get batch number\r\n'+fetchBatch.message);
+		return new GTS.DM.WrappedResult<boolean>().setError('Unable to get batch number\r\n'+fetchBatch.message);
 	}
 	for(var i:number = 0; i < 100; i++){
 		await DB.addTestUUID( await newUUID(), fetchBatch.data!, sessionUUID);
 	}
-	return new GTS.WrappedResult<boolean>().setData(true);
+	return new GTS.DM.WrappedResult<boolean>().setData(true);
 }
 
 // get a randomness from slight extra delay introduced in calls to setTimeout
 async function randomDelay(): Promise<number>{
 	var startTime:number = new Date().getTime();
-	await GTS.delay(10);
+	await Threading.pause(10);
 	var endTime:number = new Date().getTime();
 	return(endTime - startTime);
 }
@@ -87,25 +89,25 @@ function xmur3(str:string):Function {
 }
 
 namespace DB{
-	export async function getNewBatchNum( uuid: string): Promise<GTS.WrappedResult<number>>{
-		let fetchConn:GTS.WrappedResult<DBCore.Client> =  await DBCore.getConnection('getDecimals', uuid);
+	export async function getNewBatchNum( uuid: string): Promise<GTS.DM.WrappedResult<number>>{
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('getDecimals', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<number>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<number>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let client:DBCore.Client = fetchConn.data!;
 		const res = await client.query('CALL getTestUUIDBatchNum(0);');
-		if(res.rowCount == 0){ return new GTS.WrappedResult<number>().setData(-1); }
-		return new GTS.WrappedResult<number>().setData(res.rows[0].num);
+		if(res.rowCount == 0){ return new GTS.DM.WrappedResult<number>().setData(-1); }
+		return new GTS.DM.WrappedResult<number>().setData(res.rows[0].num);
 	}
 	
-	export async function addTestUUID(testUUID:string, batchNum:number, uuid:string ): Promise<GTS.WrappedResult<void>>{
-		let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('addTestUUID', uuid);
+	export async function addTestUUID(testUUID:string, batchNum:number, uuid:string ): Promise<GTS.DM.WrappedResult<void>>{
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('addTestUUID', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let parts:string[] = testUUID.split('-');
 		let client:DBCore.Client = fetchConn.data!;
 		await client.query( 'CALL addTestUUID($1,$2,$3,$4,$5,$6);',[batchNum, parts[0], parts[1], parts[2], parts[3], parts[4]]);
-		return new GTS.WrappedResult<void>().setNoData();
+		return new GTS.DM.WrappedResult<void>().setNoData();
 	}
 }

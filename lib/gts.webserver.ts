@@ -1,4 +1,4 @@
-import * as GTS from "./gts.webapp";
+import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
 import * as UUID from "./gts.uuid";
 import Express from 'express';
@@ -7,7 +7,7 @@ const PATH = require('path');
 export class WebServerHelper{
 	// store which uuids are in use
 	// if there is a clash of duplicate ids, make sure they are not for concurrently processed requests
-	private uuidRegister:GTS.HashTable<boolean>;
+	private uuidRegister:GTS.DM.HashTable<boolean>;
 
 	constructor(){
 		this.uuidRegister = {};
@@ -50,41 +50,41 @@ export class WebServerHelper{
 		let logParams:string[] = [];
 		try{
 			// support parsing known params and providing sanitized values to the work to be done
-			let requiredParamChecks:GTS.CheckedValue<string>[] = [];
+			let requiredParamChecks:GTS.DM.CheckedValue<string>[] = [];
 			for(var i:number=0;i<requiredParams.length;i++){
 				switch(requiredParams[i]){
 					case 'txHash':
-						let txHashCheck:GTS.CheckedValue<string> = this.requireTransactionHash(req, res);
+						let txHashCheck:GTS.DM.CheckedValue<string> = this.requireTransactionHash(req, res);
 						if(!txHashCheck.isValid){ return; }
 						requiredParamChecks.push(txHashCheck);
 						logParams.push('txHash='+txHashCheck.value);
 						break;
 					case 'network':
-						let networkCheck:GTS.CheckedValue<string> = this.requireNetwork(req, res);
+						let networkCheck:GTS.DM.CheckedValue<string> = this.requireNetwork(req, res);
 						if(!networkCheck.isValid){ return; }
 						requiredParamChecks.push(networkCheck);
 						logParams.push('network='+networkCheck.value);
 						break;
 					case 'address':
-						let addressCheck:GTS.CheckedValue<string> = this.requireBech32Address(req, res);
+						let addressCheck:GTS.DM.CheckedValue<string> = this.requireBech32Address(req, res);
 						if(!addressCheck.isValid){ return; }
 						requiredParamChecks.push(addressCheck);
 						logParams.push('address='+addressCheck.value);
 						break;
 					case 'hex':
-						let hexCheck:GTS.CheckedValue<string> = this.requireHex(req, res);
+						let hexCheck:GTS.DM.CheckedValue<string> = this.requireHex(req, res);
 						if(!hexCheck.isValid){ return; }
 						requiredParamChecks.push(hexCheck);
 						logParams.push('hex='+hexCheck.value);
 						break;
 					case 'data':
-						let dataCheck:GTS.CheckedValue<string> = this.requireData(req, res);
+						let dataCheck:GTS.DM.CheckedValue<string> = this.requireData(req, res);
 						if(!dataCheck.isValid){ return; }
 						requiredParamChecks.push(dataCheck);
 						logParams.push('data='+dataCheck.value);
 						break;
 					case 'id':
-						let idCheck:GTS.CheckedValue<string> = this.requireId(req, res);
+						let idCheck:GTS.DM.CheckedValue<string> = this.requireId(req, res);
 						if(!idCheck.isValid){ return; }
 						requiredParamChecks.push(idCheck);
 						logParams.push('id='+idCheck.value);
@@ -103,7 +103,7 @@ export class WebServerHelper{
 		} finally {
 			// log the request that was served
 			let timeEnd:number = new Date().getTime();
-			let storeLog:GTS.WrappedResult<void> = await DB.addWeblog(uuid, requestUrl, logParams.join('\r\n'), response.success, (timeEnd-timeStart)/1000, response.logMessage, response.errorMessage);
+			let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, requestUrl, logParams.join('\r\n'), response.success, (timeEnd-timeStart)/1000, response.logMessage, response.errorMessage);
 			if(storeLog.error){
 				console.error('unable to store log of web request');
 				console.error(storeLog.message);
@@ -121,7 +121,7 @@ export class WebServerHelper{
 		webapp.get('/weblogs', (req:Express.Request, res:Express.Response) => res.sendFile(PATH.join(__dirname, '../weblogs.html')));
 
 		web.registerHandler(webapp, '/req/weblogs', [], async function(uuid:string){
-			let result:GTS.WrappedResult<Weblog[]> = await DB.getWeblogs(uuid);
+			let result:GTS.DM.WrappedResult<Weblog[]> = await DB.getWeblogs(uuid);
 			if(result.error){
 				return new WebResponse(false, result.message, 'Failed to fetch Weblogs','');
 			} else {
@@ -131,8 +131,8 @@ export class WebServerHelper{
 			}
 		});
 
-		web.registerHandler(webapp, '/req/prune-weblogs', ['id'], async function(uuid:string, idCheck:GTS.CheckedValue<string>){
-			let result:GTS.WrappedResult<void> = await DB.pruneWeblogs(uuid, idCheck.value);
+		web.registerHandler(webapp, '/req/prune-weblogs', ['id'], async function(uuid:string, idCheck:GTS.DM.CheckedValue<string>){
+			let result:GTS.DM.WrappedResult<void> = await DB.pruneWeblogs(uuid, idCheck.value);
 			if(result.error){
 				return new WebResponse(false, result.message, 'Failed to prune Weblogs','');
 			} else {
@@ -147,91 +147,91 @@ export class WebServerHelper{
 	// ---------------------------------------------
 
 	// check that a transaction hash is sent for the request
-	requireTransactionHash(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireTransactionHash(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.txHash) === undefined){
 			res.send( new WebResponse(false, 'Missing txHash param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let txHash:string = req.query.txHash!.toString();
 		if(txHash && txHash.length==64 && GTS.HexUtils.checkStringIsHexEncoded(txHash)){
-			return new GTS.CheckedValue<string>(true,txHash);
+			return new GTS.DM.CheckedValue<string>(true,txHash);
 		} else {
 			res.send( new WebResponse(false, 'Invalid transaction hash param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 
 	// check that a network is sent for the request
-	requireNetwork(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireNetwork(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.network) === undefined){
 			res.send( new WebResponse(false, 'Missing network param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let network:string = req.query.network!.toString();
 		if(network && (network == 'M' || network == 'T' || network == 'D')){
-			return new GTS.CheckedValue<string>(true,network);
+			return new GTS.DM.CheckedValue<string>(true,network);
 		} else {
 			res.send( new WebResponse(false, 'Invalid network param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 
 	// check that a bech32 address is sent for the request
-	requireBech32Address(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireBech32Address(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.address) === undefined){
 			res.send( new WebResponse(false, 'Missing address param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let address:string = req.query.address!.toString();
 		if(address && GTS.AddressUtils.checkAddressStringIsBech32(address)){
-			return new GTS.CheckedValue<string>(true,address);
+			return new GTS.DM.CheckedValue<string>(true,address);
 		} else {
 			res.send( new WebResponse(false, 'Invalid address param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 
 	// check that hex is sent for the request
-	requireHex(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireHex(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.hex) === undefined){
 			res.send( new WebResponse(false, 'Missing hex param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let hex:string = req.query.hex!.toString();
 		if(hex && GTS.HexUtils.checkStringIsHexEncodedList(hex)){
-			return new GTS.CheckedValue<string>(true,hex);
+			return new GTS.DM.CheckedValue<string>(true,hex);
 		} else {
 			res.send( new WebResponse(false, 'Invalid hex param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 
 	// check that data is sent for the request
-	requireData(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireData(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.data) === undefined){
 			res.send( new WebResponse(false, 'Missing data param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let data:string = req.query.data!.toString();
 		if(GTS.HexUtils.checkStringIsHexEncodedList(data)){
-			return new GTS.CheckedValue<string>(true,data);
+			return new GTS.DM.CheckedValue<string>(true,data);
 		} else {
 			res.send( new WebResponse(false, 'Invalid data param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 	
-	requireId(req:Express.Request, res:Express.Response): GTS.CheckedValue<string>{
+	requireId(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.id) === undefined){
 			res.send( new WebResponse(false, 'Missing id param','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let id:string = req.query.id!.toString();
 		if(GTS.StringUtils.checkStringIsInteger(id)){
-			return new GTS.CheckedValue<string>(true,id);
+			return new GTS.DM.CheckedValue<string>(true,id);
 		} else {
 			res.send( new WebResponse(false, 'Invalid id param received','','').toString() );
-			return new GTS.CheckedValue<string>(false,'');
+			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 }
@@ -290,22 +290,22 @@ export class Weblog{
 
 export namespace DB{
 	// log a request has been served by webserver
-	export async function addWeblog(uuid:string, requestUrl:string, requestParams:string, responseSuccess:boolean, responseDuration:number, logMessage:string, errorMessage:string): Promise<GTS.WrappedResult<void>>{
-		let fetchConn:GTS.WrappedResult<DBCore.Client> =  await DBCore.getConnection('addWebLog', uuid);
+	export async function addWeblog(uuid:string, requestUrl:string, requestParams:string, responseSuccess:boolean, responseDuration:number, logMessage:string, errorMessage:string): Promise<GTS.DM.WrappedResult<void>>{
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('addWebLog', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let client:DBCore.Client = fetchConn.data!;
 		await client.query('CALL addWebLog($1,$2,$3,$4,$5,$6,$7);',[uuid,requestUrl,requestParams,responseSuccess,responseDuration,logMessage,errorMessage]);
-		return new GTS.WrappedResult<void>().setNoData();
+		return new GTS.DM.WrappedResult<void>().setNoData();
 	}
 
 	// view all weblogs recorded
-	export async function getWeblogs(uuid: string): Promise<GTS.WrappedResult<Weblog[]>>{
+	export async function getWeblogs(uuid: string): Promise<GTS.DM.WrappedResult<Weblog[]>>{
 		let retvalData: Weblog[] = [];
-		let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('getWeblogs', uuid);
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('getWeblogs', uuid);
 		if(fetchConn.error || fetchConn.data == null){
-			return new GTS.WrappedResult<Weblog[]>().setError('DB Connection error\r\n'+fetchConn.message);
+			return new GTS.DM.WrappedResult<Weblog[]>().setError('DB Connection error\r\n'+fetchConn.message);
 		}
 		let client:DBCore.Client = fetchConn.data!;
 		const res = await client.query('SELECT id, uuid, requestedat, requesturl, requestparams, responsesuccess, responseduration, logmessage, errormessage FROM WebLogs ORDER BY id ASC;');
@@ -322,20 +322,20 @@ export namespace DB{
 			l.errorMessage = res.rows[i].errormessage;
 			retvalData.push(l);
 		}
-		return new GTS.WrappedResult<Weblog[]>().setData(retvalData);
+		return new GTS.DM.WrappedResult<Weblog[]>().setData(retvalData);
 	}
 	
-	export async function pruneWeblogs(uuid:string, id:string): Promise<GTS.WrappedResult<void>>{
+	export async function pruneWeblogs(uuid:string, id:string): Promise<GTS.DM.WrappedResult<void>>{
 		try{
-			let fetchConn:GTS.WrappedResult<DBCore.Client> = await DBCore.getConnection('pruneWeblogs', uuid);
+			let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('pruneWeblogs', uuid);
 			if(fetchConn.error || fetchConn.data == null){
-				return new GTS.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
+				return new GTS.DM.WrappedResult<void>().setError('DB Connection error\r\n'+fetchConn.message);
 			}
 			let client:DBCore.Client = fetchConn.data!;
 			await client.query('DELETE FROM WebLogs WHERE id <= $1;', [id]);
-			return new GTS.WrappedResult<void>().setNoData();
+			return new GTS.DM.WrappedResult<void>().setNoData();
 		}catch( err:any ){
-			return new GTS.WrappedResult<void>().setError(err.toString());
+			return new GTS.DM.WrappedResult<void>().setError(err.toString());
 		}
 	}
 }

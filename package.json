@@ -1,6 +1,6 @@
 {
   "name": "gts-webapp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Framework to help build web applications",
   "main": "./dist/gts.webapp.js",
   "types": "./dist/gts.webapp.d.ts",
@@ -9,7 +9,7 @@
     "compile": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Sean Armstrong, Glentoran Software Ltd",
+  "author": "Sean Armstrong, Glentoran Software Ltd (GTSNZ)",
   "license": "MIT",
   "devDependencies": {
     "@types/express": "^4.17.13",
