@@ -1,13 +1,17 @@
 import axios from 'axios';
 import getMAC, { isMAC } from 'getmac'
 import * as GTS from "./gts";
-export * as GTS from "./gts";
 
 // reference to other files
+export * as GTS from "./gts";
 export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
 export * as Threading from "./gts.threading";
+
+// quicker reference to commly used types
+export {WebResponse} from "./gts.webserver";
+export class WrappedResult<T> extends GTS.DM.WrappedResult<T> {};
 
 // Provide access to the MAC address of the server (used to give guids cross server uniqueness)
 export function getServerMAC(){

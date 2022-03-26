@@ -4,6 +4,9 @@ export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
 export * as Threading from "./gts.threading";
+export { WebResponse } from "./gts.webserver";
+export declare class WrappedResult<T> extends GTS.DM.WrappedResult<T> {
+}
 export declare function getServerMAC(): string;
 export declare function fetchJSON<T>(url: string): Promise<GTS.DM.WrappedResult<T>>;
 export declare namespace Telegram {
