@@ -2,7 +2,6 @@ import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
 import * as WS from "./gts.webserver";
 import Express from 'express';
-const PATH = require('path');
 
 const doLogging:boolean = false;												// if thread debug logging is being recorded
 let threadingLogId:number = 0;													// incrementing ids for sequencing of log entries
