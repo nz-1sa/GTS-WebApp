@@ -2,7 +2,9 @@ import * as GTS from "./gts";
 import Express from 'express';
 export declare class WebServerHelper {
     private uuidRegister;
-    constructor();
+    private siteRoot;
+    constructor(pSiteRoot: string);
+    getFile(fileName: string): string;
     registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
     private handleRequest;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;

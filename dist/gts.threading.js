@@ -36,7 +36,6 @@ exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = expo
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
-const PATH = require('path');
 const doLogging = false; // if thread debug logging is being recorded
 let threadingLogId = 0; // incrementing ids for sequencing of log entries
 const threadingLogGroup = new Date().getTime(); // single server, the id is in groups of when the file loaded
@@ -463,7 +462,7 @@ function doWithTimeout(uuid, timeout, action) {
 }
 exports.doWithTimeout = doWithTimeout;
 function attachThreadingDebugInterface(web, webapp) {
-    webapp.get('/threadinglogs', (req, res) => res.sendFile(PATH.join(__dirname, '../threadinglogs.html')));
+    webapp.get('/threadinglogs', (req, res) => res.sendFile(web.getFile('threadinglogs.html')));
     web.registerHandler(webapp, '/req/threadinglogs', [], function (uuid) {
         return __awaiter(this, void 0, void 0, function* () {
             try {

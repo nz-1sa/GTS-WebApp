@@ -39,8 +39,14 @@ const UUID = __importStar(require("./gts.uuid"));
 const PATH = require('path');
 class WebServerHelper {
     // initialise a new uuid register when the WebServerHelper is instantiated
-    constructor() {
+    constructor(pSiteRoot) {
+        this.siteRoot = '';
         this.uuidRegister = {};
+        this.siteRoot = pSiteRoot; // set where files are served from
+    }
+    // get a file in reference to the website root
+    getFile(fileName) {
+        return PATH.join(this.siteRoot, fileName);
     }
     // register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
     registerHandler(webapp, url, requiredParams, work) {
@@ -161,7 +167,7 @@ class WebServerHelper {
     // attach code to view and prune weblogs
     attachWeblogsInterface(web, webapp) {
         // serve a page to view weblogs
-        webapp.get('/weblogs', (req, res) => res.sendFile(PATH.join(__dirname, '../weblogs.html')));
+        webapp.get('/weblogs', (req, res) => res.sendFile(web.getFile('weblogs.html')));
         // fetch weblogs from the db
         web.registerHandler(webapp, '/req/weblogs', [], function (uuid) {
             return __awaiter(this, void 0, void 0, function* () {
