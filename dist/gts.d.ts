@@ -1,44 +1,8 @@
-export declare namespace DateTimeUtils {
-    function timestampToDateString(timestamp: number): string;
-    function dateToString(d: Date): string;
-}
-export declare namespace Base64Utils {
-    function checkStringIsBase64Encoded(base64test: string): boolean;
-    function decodeString(str: string): string;
-    function encodeString(str: string): string;
-    function encodeNumber(num: number): string;
-    function decodeNumber(str: string): number;
-}
-export declare namespace HexUtils {
-    function checkStringIsHexEncoded(hex: string): boolean;
-    function checkStringIsHexEncodedList(hexlist: string): boolean;
-    function decodeString(hex: string): DM.WrappedResult<string>;
-    function encodeString(str: string): string;
-    function decodeNumber(hex: string): DM.WrappedResult<number>;
-    function encodeNumber(num: number): string;
-    function autoDecodeValueFromHex(hex: string): DM.TypedStringVal;
-    function multiDecodeHex(hex: string): HexDecoded;
-    class HexDecoded {
-        hex: string;
-        number: number;
-        address: string;
-        string: string;
-        escaped: string;
-    }
-}
-export declare namespace AddressUtils {
-    function checkAddressStringIsBech32(bech32: string): boolean;
-    function convertAddressHexToBech32(hex: string): DM.WrappedResult<string>;
-    function convertAddressBech32ToHex(address: string): string;
-    function convertAddressBase64ToBech32(base64: string): any;
-    function checkAddressHexIsSC(hex: string): boolean;
-}
-export declare namespace StringUtils {
-    function checkStringIsAsciiPrintable(str: string): boolean;
-    function checkStringIsInteger(num: string): boolean;
-    function escapeDoubleQuotes(obj: any): string;
-    function escapeNewLines(obj: any): string;
-}
+export * as Base64Utils from "./gts.utils.base64";
+export * as HexUtils from "./gts.utils.hex";
+export * as AddressUtils from "./gts.utils.address";
+export * as StringUtils from "./gts.utils.string";
+export * as DateTimeUtils from "./gts.utils.datetime";
 export declare namespace DM {
     interface HashTable<T> {
         [key: string]: T;

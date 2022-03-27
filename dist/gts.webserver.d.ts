@@ -3,15 +3,15 @@ import Express from 'express';
 export declare class WebServerHelper {
     private uuidRegister;
     constructor();
-    registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): void;
-    handleRequest(req: Express.Request, res: Express.Response, requestUrl: string, requiredParams: string[], work: Function): Promise<void>;
+    registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    private handleRequest;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
-    requireTransactionHash(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
-    requireNetwork(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
-    requireBech32Address(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
-    requireHex(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
-    requireData(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
-    requireId(req: Express.Request, res: Express.Response): GTS.DM.CheckedValue<string>;
+    private requireTransactionHash;
+    private requireNetwork;
+    private requireBech32Address;
+    private requireHex;
+    private requireHexList;
+    private requireId;
 }
 export declare class WebResponse {
     success: boolean;

@@ -39,7 +39,7 @@ exports.Telegram = exports.fetchJSON = exports.getServerMAC = exports.WrappedRes
 const axios_1 = __importDefault(require("axios"));
 const getmac_1 = __importDefault(require("getmac"));
 const GTS = __importStar(require("./gts"));
-// reference to other files
+// provide code from GTS core files
 exports.GTS = __importStar(require("./gts"));
 exports.UUID = __importStar(require("./gts.uuid"));
 exports.DBCore = __importStar(require("./gts.db"));

@@ -38,14 +38,17 @@ const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
 const PATH = require('path');
 class WebServerHelper {
+    // initialise a new uuid register when the WebServerHelper is instantiated
     constructor() {
         this.uuidRegister = {};
     }
-    // register how to hanle an url
+    // register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
     registerHandler(webapp, url, requiredParams, work) {
-        webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
-            yield this.handleRequest(req, res, url, requiredParams, work);
-        }));
+        return __awaiter(this, void 0, void 0, function* () {
+            webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                yield this.handleRequest(req, res, url, requiredParams, work);
+            }));
+        });
     }
     // common handling of webrequests
     // assigns uuid to each request
@@ -111,13 +114,13 @@ class WebServerHelper {
                             requiredParamChecks.push(hexCheck);
                             logParams.push('hex=' + hexCheck.value);
                             break;
-                        case 'data':
-                            let dataCheck = this.requireData(req, res);
-                            if (!dataCheck.isValid) {
+                        case 'hexlist':
+                            let hexlistCheck = this.requireHexList(req, res);
+                            if (!hexlistCheck.isValid) {
                                 return;
                             }
-                            requiredParamChecks.push(dataCheck);
-                            logParams.push('data=' + dataCheck.value);
+                            requiredParamChecks.push(hexlistCheck);
+                            logParams.push('hexlist=' + hexlistCheck.value);
                             break;
                         case 'id':
                             let idCheck = this.requireId(req, res);
@@ -134,6 +137,7 @@ class WebServerHelper {
                 res.send(response.toString());
             }
             catch (err) {
+                // show and record any error encounted
                 console.error(`UUID:${uuid} Error handling ${requestUrl}`);
                 console.error(err);
                 response = new WebResponse(false, err.toString(), `Caught Error handling ${requestUrl}`, '');
@@ -152,12 +156,13 @@ class WebServerHelper {
                 // release the uuid from the register of those in use
                 delete this.uuidRegister[uuid];
             }
-            //console.log(`${new Date().getTime()}@request finished@${requestUrl}@${uuid}`);
         });
     }
-    // attach code to serve and prune weblogs
+    // attach code to view and prune weblogs
     attachWeblogsInterface(web, webapp) {
+        // serve a page to view weblogs
         webapp.get('/weblogs', (req, res) => res.sendFile(PATH.join(__dirname, '../weblogs.html')));
+        // fetch weblogs from the db
         web.registerHandler(webapp, '/req/weblogs', [], function (uuid) {
             return __awaiter(this, void 0, void 0, function* () {
                 let result = yield DB.getWeblogs(uuid);
@@ -171,6 +176,7 @@ class WebServerHelper {
                 }
             });
         });
+        // delete weblogs from a given id and older
         web.registerHandler(webapp, '/req/prune-weblogs', ['id'], function (uuid, idCheck) {
             return __awaiter(this, void 0, void 0, function* () {
                 let result = yield DB.pruneWeblogs(uuid, idCheck.value);
@@ -246,21 +252,22 @@ class WebServerHelper {
             return new GTS.DM.CheckedValue(false, '');
         }
     }
-    // check that data is sent for the request
-    requireData(req, res) {
-        if (typeof (req.query.data) === undefined) {
-            res.send(new WebResponse(false, 'Missing data param', '', '').toString());
+    // check that hexlist is sent for the request
+    requireHexList(req, res) {
+        if (typeof (req.query.hexlist) === undefined) {
+            res.send(new WebResponse(false, 'Missing hexlist param', '', '').toString());
             return new GTS.DM.CheckedValue(false, '');
         }
-        let data = req.query.data.toString();
-        if (GTS.HexUtils.checkStringIsHexEncodedList(data)) {
-            return new GTS.DM.CheckedValue(true, data);
+        let hexlist = req.query.hexlist.toString();
+        if (GTS.HexUtils.checkStringIsHexEncodedList(hexlist)) {
+            return new GTS.DM.CheckedValue(true, hexlist);
         }
         else {
-            res.send(new WebResponse(false, 'Invalid data param received', '', '').toString());
+            res.send(new WebResponse(false, 'Invalid list param received', '', '').toString());
             return new GTS.DM.CheckedValue(false, '');
         }
     }
+    // check that an integer id is sent for the request
     requireId(req, res) {
         if (typeof (req.query.id) === undefined) {
             res.send(new WebResponse(false, 'Missing id param', '', '').toString());
@@ -362,6 +369,7 @@ var DB;
         });
     }
     DB.getWeblogs = getWeblogs;
+    // delete web logs by id and older
     function pruneWeblogs(uuid, id) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
