@@ -9,10 +9,18 @@ export class WebServerHelper{
 	// each request gets an uuid
 	// if there is a clash of duplicate ids, make sure they are not for concurrently processed requests
 	private uuidRegister:GTS.DM.HashTable<boolean>;
+	
+	private siteRoot = '';
 
 	// initialise a new uuid register when the WebServerHelper is instantiated
-	constructor(){
+	constructor( pSiteRoot:string ){
 		this.uuidRegister = {};
+		this.siteRoot = pSiteRoot;			// set where files are served from
+	}
+	
+	// get a file in reference to the website root
+	public getFile( fileName:string ):string{
+		return PATH.join(this.siteRoot, fileName);
 	}
 	
 	// register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
@@ -121,7 +129,7 @@ export class WebServerHelper{
 	// attach code to view and prune weblogs
 	public attachWeblogsInterface(web:WebServerHelper, webapp:Express.Application):void{
 		// serve a page to view weblogs
-		webapp.get('/weblogs', (req:Express.Request, res:Express.Response) => res.sendFile(PATH.join(__dirname, '../weblogs.html')));
+		webapp.get('/weblogs', (req:Express.Request, res:Express.Response) => res.sendFile(web.getFile('weblogs.html')));
 
 		// fetch weblogs from the db
 		web.registerHandler(webapp, '/req/weblogs', [], async function(uuid:string){

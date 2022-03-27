@@ -324,7 +324,7 @@ export async function doWithTimeout<T>(uuid:string, timeout:number, action:Funct
 
 
 export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
-	webapp.get('/threadinglogs', (req:Express.Request, res:Express.Response) => res.sendFile(PATH.join(__dirname, '../threadinglogs.html')));
+	webapp.get('/threadinglogs', (req:Express.Request, res:Express.Response) => res.sendFile(web.getFile('threadinglogs.html')));
 	web.registerHandler(webapp, '/req/threadinglogs', [], async function(uuid:string){
 		try{
 			let getLogs:GTS.DM.WrappedResult<ThreadingLog[]> = await DB.getThreadingLogs(uuid);
