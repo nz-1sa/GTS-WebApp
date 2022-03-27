@@ -6,15 +6,17 @@ const PATH = require('path');
 
 export class WebServerHelper{
 	// store which uuids are in use
+	// each request gets an uuid
 	// if there is a clash of duplicate ids, make sure they are not for concurrently processed requests
 	private uuidRegister:GTS.DM.HashTable<boolean>;
 
+	// initialise a new uuid register when the WebServerHelper is instantiated
 	constructor(){
 		this.uuidRegister = {};
 	}
 	
-	// register how to hanle an url
-	registerHandler(webapp:Express.Application, url:string, requiredParams:string[], work:Function):void{
+	// register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
+	public async registerHandler(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
 		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
 			await this.handleRequest(req, res, url, requiredParams, work);
 		});
@@ -25,7 +27,7 @@ export class WebServerHelper{
 	// records the request and the time to serve it
 	// ensures database connection is released
 	// provides simple error handling
-	async handleRequest(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
+	private async handleRequest(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
 		let timeStart:number = new Date().getTime();
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
 
@@ -77,11 +79,11 @@ export class WebServerHelper{
 						requiredParamChecks.push(hexCheck);
 						logParams.push('hex='+hexCheck.value);
 						break;
-					case 'data':
-						let dataCheck:GTS.DM.CheckedValue<string> = this.requireData(req, res);
-						if(!dataCheck.isValid){ return; }
-						requiredParamChecks.push(dataCheck);
-						logParams.push('data='+dataCheck.value);
+					case 'hexlist':
+						let hexlistCheck:GTS.DM.CheckedValue<string> = this.requireHexList(req, res);
+						if(!hexlistCheck.isValid){ return; }
+						requiredParamChecks.push(hexlistCheck);
+						logParams.push('hexlist='+hexlistCheck.value);
 						break;
 					case 'id':
 						let idCheck:GTS.DM.CheckedValue<string> = this.requireId(req, res);
@@ -96,6 +98,7 @@ export class WebServerHelper{
 			response = await work(uuid, ...requiredParamChecks);
 			res.send(response.toString());
 		} catch (err:any){
+			// show and record any error encounted
 			console.error(`UUID:${uuid} Error handling ${requestUrl}`);
 			console.error(err);
 			response = new WebResponse(false, err.toString(), `Caught Error handling ${requestUrl}`,'');
@@ -113,13 +116,14 @@ export class WebServerHelper{
 			// release the uuid from the register of those in use
 			delete this.uuidRegister[uuid];
 		}
-		//console.log(`${new Date().getTime()}@request finished@${requestUrl}@${uuid}`);
 	}
 	
-	// attach code to serve and prune weblogs
-	attachWeblogsInterface(web:WebServerHelper, webapp:Express.Application):void{
+	// attach code to view and prune weblogs
+	public attachWeblogsInterface(web:WebServerHelper, webapp:Express.Application):void{
+		// serve a page to view weblogs
 		webapp.get('/weblogs', (req:Express.Request, res:Express.Response) => res.sendFile(PATH.join(__dirname, '../weblogs.html')));
 
+		// fetch weblogs from the db
 		web.registerHandler(webapp, '/req/weblogs', [], async function(uuid:string){
 			let result:GTS.DM.WrappedResult<Weblog[]> = await DB.getWeblogs(uuid);
 			if(result.error){
@@ -131,6 +135,7 @@ export class WebServerHelper{
 			}
 		});
 
+		// delete weblogs from a given id and older
 		web.registerHandler(webapp, '/req/prune-weblogs', ['id'], async function(uuid:string, idCheck:GTS.DM.CheckedValue<string>){
 			let result:GTS.DM.WrappedResult<void> = await DB.pruneWeblogs(uuid, idCheck.value);
 			if(result.error){
@@ -147,7 +152,7 @@ export class WebServerHelper{
 	// ---------------------------------------------
 
 	// check that a transaction hash is sent for the request
-	requireTransactionHash(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+	private requireTransactionHash(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.txHash) === undefined){
 			res.send( new WebResponse(false, 'Missing txHash param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
@@ -162,7 +167,7 @@ export class WebServerHelper{
 	}
 
 	// check that a network is sent for the request
-	requireNetwork(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+	private requireNetwork(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.network) === undefined){
 			res.send( new WebResponse(false, 'Missing network param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
@@ -177,7 +182,7 @@ export class WebServerHelper{
 	}
 
 	// check that a bech32 address is sent for the request
-	requireBech32Address(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+	private requireBech32Address(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.address) === undefined){
 			res.send( new WebResponse(false, 'Missing address param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
@@ -192,7 +197,7 @@ export class WebServerHelper{
 	}
 
 	// check that hex is sent for the request
-	requireHex(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+	private requireHex(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.hex) === undefined){
 			res.send( new WebResponse(false, 'Missing hex param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
@@ -206,22 +211,23 @@ export class WebServerHelper{
 		}
 	}
 
-	// check that data is sent for the request
-	requireData(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.data) === undefined){
-			res.send( new WebResponse(false, 'Missing data param','','').toString() );
+	// check that hexlist is sent for the request
+	private requireHexList(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+		if(typeof(req.query.hexlist) === undefined){
+			res.send( new WebResponse(false, 'Missing hexlist param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
-		let data:string = req.query.data!.toString();
-		if(GTS.HexUtils.checkStringIsHexEncodedList(data)){
-			return new GTS.DM.CheckedValue<string>(true,data);
+		let hexlist:string = req.query.hexlist!.toString();
+		if(GTS.HexUtils.checkStringIsHexEncodedList(hexlist)){
+			return new GTS.DM.CheckedValue<string>(true,hexlist);
 		} else {
-			res.send( new WebResponse(false, 'Invalid data param received','','').toString() );
+			res.send( new WebResponse(false, 'Invalid list param received','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
 	
-	requireId(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+	// check that an integer id is sent for the request
+	private requireId(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
 		if(typeof(req.query.id) === undefined){
 			res.send( new WebResponse(false, 'Missing id param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
@@ -234,6 +240,8 @@ export class WebServerHelper{
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
+	
+	//TODO: allow some cusom validation (regex?)
 }
 
 // When using await Webserver.handleRequest to process web requests, WebResponse is the format that worker functions provide the data to return
@@ -325,6 +333,7 @@ export namespace DB{
 		return new GTS.DM.WrappedResult<Weblog[]>().setData(retvalData);
 	}
 	
+	// delete web logs by id and older
 	export async function pruneWeblogs(uuid:string, id:string): Promise<GTS.DM.WrappedResult<void>>{
 		try{
 			let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('pruneWeblogs', uuid);

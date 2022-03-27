@@ -2,7 +2,7 @@ import axios from 'axios';
 import getMAC, { isMAC } from 'getmac'
 import * as GTS from "./gts";
 
-// reference to other files
+// provide code from GTS core files
 export * as GTS from "./gts";
 export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
