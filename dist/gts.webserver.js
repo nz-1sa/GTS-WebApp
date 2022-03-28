@@ -48,7 +48,7 @@ class WebServerHelper {
     getFile(fileName) {
         return PATH.join(this.siteRoot, fileName);
     }
-    // register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
+    // register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do
     registerHandler(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
             webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -245,6 +245,8 @@ class WebServerHelper {
     }
     // check that hex is sent for the request
     requireHex(req, res) {
+        console.log(typeof (req.query.hex));
+        console.log(req.query.hex);
         if (typeof (req.query.hex) === undefined) {
             res.send(new WebResponse(false, 'Missing hex param', '', '').toString());
             return new GTS.DM.CheckedValue(false, '');

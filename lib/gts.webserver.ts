@@ -23,7 +23,7 @@ export class WebServerHelper{
 		return PATH.join(this.siteRoot, fileName);
 	}
 	
-	// register how to hanle a web request; the url to listen on, requierd parameters to be sent, and the function to do
+	// register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do
 	public async registerHandler(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
 		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
 			await this.handleRequest(req, res, url, requiredParams, work);
@@ -206,6 +206,8 @@ export class WebServerHelper{
 
 	// check that hex is sent for the request
 	private requireHex(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
+		console.log( typeof(req.query.hex) );
+		console.log( req.query.hex );
 		if(typeof(req.query.hex) === undefined){
 			res.send( new WebResponse(false, 'Missing hex param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
