@@ -245,9 +245,7 @@ class WebServerHelper {
     }
     // check that hex is sent for the request
     requireHex(req, res) {
-        console.log(typeof (req.query.hex));
-        console.log(req.query.hex);
-        if (typeof (req.query.hex) === undefined) {
+        if (req.query.hex === undefined) {
             res.send(new WebResponse(false, 'Missing hex param', '', '').toString());
             return new GTS.DM.CheckedValue(false, '');
         }
