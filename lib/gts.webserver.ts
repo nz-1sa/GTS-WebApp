@@ -161,7 +161,7 @@ export class WebServerHelper{
 
 	// check that a transaction hash is sent for the request
 	private requireTransactionHash(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.txHash) === undefined){
+		if(req.query.txHash === undefined){
 			res.send( new WebResponse(false, 'Missing txHash param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
@@ -176,12 +176,12 @@ export class WebServerHelper{
 
 	// check that a network is sent for the request
 	private requireNetwork(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.network) === undefined){
+		if(req.query.network === undefined){
 			res.send( new WebResponse(false, 'Missing network param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 		let network:string = req.query.network!.toString();
-		if(network && (network == 'M' || network == 'T' || network == 'D')){
+		if(network && (network == '1' || network == 'T' || network == 'D')){
 			return new GTS.DM.CheckedValue<string>(true,network);
 		} else {
 			res.send( new WebResponse(false, 'Invalid network param received','','').toString() );
@@ -191,7 +191,7 @@ export class WebServerHelper{
 
 	// check that a bech32 address is sent for the request
 	private requireBech32Address(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.address) === undefined){
+		if(req.query.address === undefined){
 			res.send( new WebResponse(false, 'Missing address param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
@@ -221,7 +221,7 @@ export class WebServerHelper{
 
 	// check that hexlist is sent for the request
 	private requireHexList(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.hexlist) === undefined){
+		if(req.query.hexlist === undefined){
 			res.send( new WebResponse(false, 'Missing hexlist param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
@@ -236,7 +236,7 @@ export class WebServerHelper{
 	
 	// check that an integer id is sent for the request
 	private requireId(req:Express.Request, res:Express.Response): GTS.DM.CheckedValue<string>{
-		if(typeof(req.query.id) === undefined){
+		if(req.query.id === undefined){
 			res.send( new WebResponse(false, 'Missing id param','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
