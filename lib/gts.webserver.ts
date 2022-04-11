@@ -99,6 +99,19 @@ export class WebServerHelper{
 						requiredParamChecks.push(idCheck);
 						logParams.push('id='+idCheck.value);
 						break;
+					default:
+						if(requiredParams[i].startsWith('custom:')){
+							let nameEnd = requiredParams[i].indexOf(' ');
+							let name = requiredParams[i].substring(7, nameEnd);
+							let regex = requiredParams[i].substring(nameEnd+1);
+							let customCheck:GTS.DM.CheckedValue<string> = this.requireCustom(req, res, name, regex);
+							if(!customCheck.isValid){ return; }
+							requiredParamChecks.push(customCheck);
+							logParams.push(`${name}=${customCheck.value}`);
+							break;
+						}
+						console.error(`unknown required param ${requiredParams[i]}`);
+						break;
 				}
 			}
 
@@ -229,7 +242,7 @@ export class WebServerHelper{
 		if(GTS.HexUtils.checkStringIsHexEncodedList(hexlist)){
 			return new GTS.DM.CheckedValue<string>(true,hexlist);
 		} else {
-			res.send( new WebResponse(false, 'Invalid list param received','','').toString() );
+			res.send( new WebResponse(false, 'Invalid hexlist param received. Please ensure the hexlist consists of 0 or more hex pairs. List items are seperated by the @ symbol','','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
 	}
@@ -249,7 +262,20 @@ export class WebServerHelper{
 		}
 	}
 	
-	//TODO: allow some cusom validation (regex?)
+	// allow cusom validation (regex)
+	private requireCustom(req:Express.Request, res:Express.Response, name:string, regex:string): GTS.DM.CheckedValue<string>{
+		if(req.query[name] === undefined){
+			res.send( new WebResponse(false, `Missing ${name} param`,'','').toString() );
+			return new GTS.DM.CheckedValue<string>(false,'');
+		}
+		let custom:string = req.query.name!.toString();
+		if(new RegExp(regex, "g").test(custom)){
+			return new GTS.DM.CheckedValue<string>(true,custom);
+		} else {
+			res.send( new WebResponse(false, `Invalid ${name} param received`,'','').toString() );
+			return new GTS.DM.CheckedValue<string>(false,'');
+		}
+	}
 }
 
 // When using await Webserver.handleRequest to process web requests, WebResponse is the format that worker functions provide the data to return

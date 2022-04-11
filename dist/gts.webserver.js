@@ -136,6 +136,21 @@ class WebServerHelper {
                             requiredParamChecks.push(idCheck);
                             logParams.push('id=' + idCheck.value);
                             break;
+                        default:
+                            if (requiredParams[i].startsWith('custom:')) {
+                                let nameEnd = requiredParams[i].indexOf(' ');
+                                let name = requiredParams[i].substring(7, nameEnd);
+                                let regex = requiredParams[i].substring(nameEnd + 1);
+                                let customCheck = this.requireCustom(req, res, name, regex);
+                                if (!customCheck.isValid) {
+                                    return;
+                                }
+                                requiredParamChecks.push(customCheck);
+                                logParams.push(`${name}=${customCheck.value}`);
+                                break;
+                            }
+                            console.error(`unknown required param ${requiredParams[i]}`);
+                            break;
                     }
                 }
                 // get the response for the request and send it
@@ -269,7 +284,7 @@ class WebServerHelper {
             return new GTS.DM.CheckedValue(true, hexlist);
         }
         else {
-            res.send(new WebResponse(false, 'Invalid list param received', '', '').toString());
+            res.send(new WebResponse(false, 'Invalid hexlist param received. Please ensure the hexlist consists of 0 or more hex pairs. List items are seperated by the @ symbol', '', '').toString());
             return new GTS.DM.CheckedValue(false, '');
         }
     }
@@ -285,6 +300,21 @@ class WebServerHelper {
         }
         else {
             res.send(new WebResponse(false, 'Invalid id param received', '', '').toString());
+            return new GTS.DM.CheckedValue(false, '');
+        }
+    }
+    // allow cusom validation (regex)
+    requireCustom(req, res, name, regex) {
+        if (req.query[name] === undefined) {
+            res.send(new WebResponse(false, `Missing ${name} param`, '', '').toString());
+            return new GTS.DM.CheckedValue(false, '');
+        }
+        let custom = req.query.name.toString();
+        if (new RegExp(regex, "g").test(custom)) {
+            return new GTS.DM.CheckedValue(true, custom);
+        }
+        else {
+            res.send(new WebResponse(false, `Invalid ${name} param received`, '', '').toString());
             return new GTS.DM.CheckedValue(false, '');
         }
     }

@@ -14,6 +14,7 @@ export declare class WebServerHelper {
     private requireHex;
     private requireHexList;
     private requireId;
+    private requireCustom;
 }
 export declare class WebResponse {
     success: boolean;
