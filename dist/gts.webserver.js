@@ -138,12 +138,9 @@ class WebServerHelper {
                             break;
                         default:
                             if (requiredParams[i].startsWith('custom:')) {
-                                console.log('custom param in use');
                                 let nameEnd = requiredParams[i].indexOf(' ');
                                 let name = requiredParams[i].substring(7, nameEnd);
-                                console.log('name is ' + name);
                                 let regex = requiredParams[i].substring(nameEnd + 1);
-                                console.log('regex is ' + regex);
                                 let customCheck = this.requireCustom(req, res, name, regex);
                                 if (!customCheck.isValid) {
                                     return;
