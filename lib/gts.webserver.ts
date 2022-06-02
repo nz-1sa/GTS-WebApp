@@ -271,7 +271,7 @@ export class WebServerHelper{
 			res.send( new WebResponse(false, `Missing ${name} param`,'','').toString() );
 			return new GTS.DM.CheckedValue<string>(false,'');
 		}
-		let custom:string = req.query.name!.toString();
+		let custom:string = req.query[name]!.toString();
 		if(new RegExp(regex, "g").test(custom)){
 			return new GTS.DM.CheckedValue<string>(true,custom);
 		} else {
