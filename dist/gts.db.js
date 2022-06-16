@@ -31,17 +31,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.releaseConnection = exports.hasConnection = exports.getConnection = exports.ClientPool = void 0;
 const GTS = __importStar(require("./gts"));
 const Threading = __importStar(require("./gts.threading"));
-const pg_1 = __importDefault(require("pg"));
+const Pg = __importStar(require("pg"));
 // Create a pg Pool from a saved database connection string
 const dbConn = process.env.DATABASE_URL;
-const pool = new pg_1.default.Pool({
+const pool = new Pg.Pool({
     connectionString: dbConn,
     ssl: { rejectUnauthorized: false }
 });
