@@ -1,6 +1,6 @@
 import * as GTS from "./gts";
 import * as Threading from "./gts.threading";
-import Pg from 'pg';
+import * as Pg from 'pg';
 
 // Client connections returned are pg Pool Clients
 export type Client = Pg.PoolClient;
