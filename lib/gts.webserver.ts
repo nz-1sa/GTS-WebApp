@@ -1,7 +1,7 @@
 import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
 import * as UUID from "./gts.uuid";
-import * as Express from 'express';
+import Express from 'express';
 const PATH = require('path');
 
 export class WebServerHelper{

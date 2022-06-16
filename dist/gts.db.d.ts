@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import * as GTS from "./gts";
-import * as Pg from 'pg';
+import Pg from 'pg';
 export declare type Client = Pg.PoolClient;
 export declare class ClientPool {
     openConnections: GTS.DM.HashTable<Pg.PoolClient>;

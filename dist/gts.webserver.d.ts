@@ -1,5 +1,5 @@
 import * as GTS from "./gts";
-import * as Express from 'express';
+import Express from 'express';
 export declare class WebServerHelper {
     private uuidRegister;
     private siteRoot;

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import * as GTS from "./gts";
 import * as WS from "./gts.webserver";
-import * as Express from 'express';
+import Express from 'express';
 export declare function pause(ms: number): Promise<void>;
 export declare class CancellableDelay {
     timeout: NodeJS.Timeout;
