@@ -6,7 +6,11 @@ export declare class WebServerHelper {
     constructor(pSiteRoot: string);
     getFile(fileName: string): string;
     registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    registerHandlerUnchecked(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    private getUUID;
+    private releaseUUID;
     private handleRequest;
+    private handleRequestUnchecked;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
     private requireTransactionHash;
     private requireNetwork;

@@ -56,6 +56,35 @@ class WebServerHelper {
             }));
         });
     }
+    // register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do. Params are not checked
+    registerHandlerUnchecked(webapp, url, requiredParams, work) {
+        return __awaiter(this, void 0, void 0, function* () {
+            webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
+            }));
+        });
+    }
+    getUUID() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const loopSafety = 20;
+            let loopIteration = 1;
+            let uuid = yield UUID.newUUID();
+            while (this.uuidRegister[uuid] && loopIteration <= loopSafety) {
+                console.log('handling uuid clash');
+                uuid = yield UUID.newUUID();
+                loopIteration++;
+            }
+            if (this.uuidRegister[uuid]) {
+                return 'ERROR: Could not generate unique uuid';
+            }
+            this.uuidRegister[uuid] = true; // record the uuid for this request is in use
+            return uuid;
+        });
+    }
+    releaseUUID(uuid) {
+        // release the uuid from the register of those in use
+        delete this.uuidRegister[uuid];
+    }
     // common handling of webrequests
     // assigns uuid to each request
     // records the request and the time to serve it
@@ -66,21 +95,14 @@ class WebServerHelper {
             let timeStart = new Date().getTime();
             var response = new WebResponse(false, '', 'Only Initialised', '');
             // get a unqiue identifier for the request being served
-            const loopSafety = 20;
-            let loopIteration = 1;
-            let uuid = yield UUID.newUUID();
-            while (this.uuidRegister[uuid] && loopIteration <= loopSafety) {
-                console.log('handling uuid clash');
-                uuid = yield UUID.newUUID();
-                loopIteration++;
-            }
-            if (this.uuidRegister[uuid]) {
-                console.error('Could not generate unique uuid');
+            let uuid = yield this.getUUID();
+            // return an error if we could not get an uuid
+            if (uuid.startsWith('ERROR:')) {
+                console.error(uuid);
                 response = new WebResponse(false, 'Could not generate unique uuid', '', '');
                 res.send(response.toString());
                 return;
             }
-            this.uuidRegister[uuid] = true; // record the uuid for this request is in use
             //  get sanitised request variables
             let logParams = [];
             try {
@@ -175,7 +197,60 @@ class WebServerHelper {
                 // free db resources for the request
                 yield DBCore.releaseConnection(uuid);
                 // release the uuid from the register of those in use
-                delete this.uuidRegister[uuid];
+                this.releaseUUID(uuid);
+            }
+        });
+    }
+    handleRequestUnchecked(req, res, requestUrl, requiredParams, work) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let timeStart = new Date().getTime();
+            var response = new WebResponse(false, '', 'Only Initialised', '');
+            // get a unqiue identifier for the request being served
+            let uuid = yield this.getUUID();
+            // return an error if we could not get an uuid
+            if (uuid.startsWith('ERROR:')) {
+                console.error(uuid);
+                response = new WebResponse(false, 'Could not generate unique uuid', '', '');
+                res.send(response.toString());
+                return;
+            }
+            let logParams = [];
+            try {
+                // get the param values if they are present
+                let paramVals = [];
+                for (var i = 0; i < requiredParams.length; i++) {
+                    let name = requiredParams[i];
+                    if (req.query[name] === undefined) {
+                        res.send(new WebResponse(false, `Missing ${name} param`, '', '').toString());
+                        return;
+                    }
+                    let val = req.query[name].toString();
+                    paramVals.push(val);
+                    logParams.push(`${name}=${val}`);
+                }
+                // get the response for the request and send it
+                response = yield work(uuid, ...paramVals);
+                res.send(response.toString());
+            }
+            catch (err) {
+                // show and record any error encounted
+                console.error(`UUID:${uuid} Error handling ${requestUrl}`);
+                console.error(err);
+                response = new WebResponse(false, err.toString(), `Caught Error handling ${requestUrl}`, '');
+                res.send(response.toString());
+            }
+            finally {
+                // log the request that was served
+                let timeEnd = new Date().getTime();
+                let storeLog = yield DB.addWeblog(uuid, requestUrl, logParams.join('\r\n'), response.success, (timeEnd - timeStart) / 1000, response.logMessage, response.errorMessage);
+                if (storeLog.error) {
+                    console.error('unable to store log of web request');
+                    console.error(storeLog.message);
+                }
+                // free db resources for the request
+                yield DBCore.releaseConnection(uuid);
+                // release the uuid from the register of those in use
+                this.releaseUUID(uuid);
             }
         });
     }

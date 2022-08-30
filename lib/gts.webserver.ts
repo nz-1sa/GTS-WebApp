@@ -30,6 +30,34 @@ export class WebServerHelper{
 		});
 	}
 	
+	// register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do. Params are not checked
+	public async registerHandlerUnchecked(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
+		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
+			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
+		});
+	}
+	
+	private async getUUID(): Promise<string>{
+		const loopSafety:number = 20;
+		let loopIteration:number = 1;
+		let uuid:string = await UUID.newUUID();
+		while(this.uuidRegister[uuid] && loopIteration<=loopSafety){
+			console.log('handling uuid clash');
+			uuid = await UUID.newUUID();
+			loopIteration++;
+		}
+		if(this.uuidRegister[uuid]){
+			return 'ERROR: Could not generate unique uuid';
+		}
+		this.uuidRegister[uuid]=true;	// record the uuid for this request is in use
+		return uuid;
+	}
+	
+	private releaseUUID(uuid:string):void{
+		// release the uuid from the register of those in use
+			delete this.uuidRegister[uuid];
+	}
+	
 	// common handling of webrequests
 	// assigns uuid to each request
 	// records the request and the time to serve it
@@ -40,21 +68,15 @@ export class WebServerHelper{
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
 
 		// get a unqiue identifier for the request being served
-		const loopSafety:number = 20;
-		let loopIteration:number = 1;
-		let uuid:string = await UUID.newUUID();
-		while(this.uuidRegister[uuid] && loopIteration<=loopSafety){
-			console.log('handling uuid clash');
-			uuid = await UUID.newUUID();
-			loopIteration++;
-		}
-		if(this.uuidRegister[uuid]){
-			console.error('Could not generate unique uuid');
+		let uuid:string = await this.getUUID();
+		
+		// return an error if we could not get an uuid
+		if(uuid.startsWith('ERROR:')){
+			console.error(uuid);
 			response = new WebResponse(false, 'Could not generate unique uuid', '','');
 			res.send(response.toString());
 			return;
 		}
-		this.uuidRegister[uuid]=true;	// record the uuid for this request is in use
 
 		//  get sanitised request variables
 		let logParams:string[] = [];
@@ -135,7 +157,60 @@ export class WebServerHelper{
 			// free db resources for the request
 			await DBCore.releaseConnection(uuid);
 			// release the uuid from the register of those in use
-			delete this.uuidRegister[uuid];
+			this.releaseUUID(uuid);
+		}
+	}
+	
+	private async handleRequestUnchecked(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
+		let timeStart:number = new Date().getTime();
+		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
+
+		// get a unqiue identifier for the request being served
+		let uuid:string = await this.getUUID();
+		
+		// return an error if we could not get an uuid
+		if(uuid.startsWith('ERROR:')){
+			console.error(uuid);
+			response = new WebResponse(false, 'Could not generate unique uuid', '','');
+			res.send(response.toString());
+			return;
+		}
+		
+		let logParams:string[] = [];
+		try{
+			// get the param values if they are present
+			let paramVals:string[] = [];
+			for(var i:number=0;i<requiredParams.length;i++){
+				let name:string = requiredParams[i];
+				if(req.query[name] === undefined){
+					res.send( new WebResponse(false, `Missing ${name} param`,'','').toString() );
+					return;
+				}
+				let val:string = req.query[name]!.toString();
+				paramVals.push(val);
+				logParams.push(`${name}=${val}`);
+			}
+			// get the response for the request and send it
+			response = await work(uuid, ...paramVals);
+			res.send(response.toString());
+		} catch (err:any){
+			// show and record any error encounted
+			console.error(`UUID:${uuid} Error handling ${requestUrl}`);
+			console.error(err);
+			response = new WebResponse(false, err.toString(), `Caught Error handling ${requestUrl}`,'');
+			res.send(response.toString());
+		} finally {
+			// log the request that was served
+			let timeEnd:number = new Date().getTime();
+			let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, requestUrl, logParams.join('\r\n'), response.success, (timeEnd-timeStart)/1000, response.logMessage, response.errorMessage);
+			if(storeLog.error){
+				console.error('unable to store log of web request');
+				console.error(storeLog.message);
+			}
+			// free db resources for the request
+			await DBCore.releaseConnection(uuid);
+			// release the uuid from the register of those in use
+			this.releaseUUID(uuid);
 		}
 	}
 	
