@@ -229,7 +229,7 @@ class WebServerHelper {
                     logParams.push(`${name}=${val}`);
                 }
                 // get the response for the request and send it
-                response = yield work(uuid, ...paramVals);
+                response = yield work(uuid, res, ...paramVals);
                 res.send(response.toString());
             }
             catch (err) {

@@ -191,7 +191,7 @@ export class WebServerHelper{
 				logParams.push(`${name}=${val}`);
 			}
 			// get the response for the request and send it
-			response = await work(uuid, ...paramVals);
+			response = await work(uuid, res, ...paramVals);
 			res.send(response.toString());
 		} catch (err:any){
 			// show and record any error encounted
