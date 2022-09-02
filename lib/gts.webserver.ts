@@ -387,10 +387,16 @@ export class Cookie{
 	}
 	
 	public getOptions(): object{
-		if(this.domain.length > 0){
-			return {expires: this.expires == new Date(0)?0:this.expires, domain:this.domain, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+		if(this.expires == new Date(0)){
+			if(this.domain.length > 0){
+				return {domain:this.domain, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+			}
+			return {path:this.path, httpOnly:this.httpOnly, secure:this.secure};
 		}
-		return {expires: this.expires == new Date(0)?0:this.expires, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+		if(this.domain.length > 0){
+			return {expires:this.expires, domain:this.domain, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+		}
+		return {expires:this.expires, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
 	}
 }
 
