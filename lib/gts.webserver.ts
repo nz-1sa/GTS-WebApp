@@ -33,7 +33,6 @@ export class WebServerHelper{
 	// register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do. Params are not checked
 	public async registerHandlerUnchecked(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
 		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
-			res.cookie('test', 'test');
 			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
 		});
 	}
@@ -165,6 +164,8 @@ export class WebServerHelper{
 	private async handleRequestUnchecked(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
 		let timeStart:number = new Date().getTime();
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
+		
+		res.cookie('test2', 'test2');
 
 		// get a unqiue identifier for the request being served
 		let uuid:string = await this.getUUID();

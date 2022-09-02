@@ -60,7 +60,6 @@ class WebServerHelper {
     registerHandlerUnchecked(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
             webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                res.cookie('test', 'test');
                 yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
             }));
         });
@@ -206,6 +205,7 @@ class WebServerHelper {
         return __awaiter(this, void 0, void 0, function* () {
             let timeStart = new Date().getTime();
             var response = new WebResponse(false, '', 'Only Initialised', '');
+            res.cookie('test2', 'test2');
             // get a unqiue identifier for the request being served
             let uuid = yield this.getUUID();
             // return an error if we could not get an uuid
