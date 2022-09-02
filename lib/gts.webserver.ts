@@ -387,10 +387,7 @@ export class Cookie{
 	}
 	
 	public getOptions(): object{
-		console.log('we have');
-		console.log(this.expires);
-		console.log(new Date(0));
-		if(this.expires == new Date(0)){
+		if(this.expires.toString() == '1970-01-01T00:00:00.000Z'){
 			console.log('trying to set session cookie');
 			if(this.domain.length > 0){
 				return {domain:this.domain, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
