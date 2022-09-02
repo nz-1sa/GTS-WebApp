@@ -422,11 +422,13 @@ class Cookie {
     }
     getOptions() {
         if (this.expires == new Date(0)) {
+            console.log('trying to set session cookie');
             if (this.domain.length > 0) {
                 return { domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
             }
             return { path: this.path, httpOnly: this.httpOnly, secure: this.secure };
         }
+        console.log('trying to set cookie with expiry date');
         if (this.domain.length > 0) {
             return { expires: this.expires, domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
         }
