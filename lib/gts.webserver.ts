@@ -165,6 +165,7 @@ export class WebServerHelper{
 		let timeStart:number = new Date().getTime();
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
 		
+		console.log(typeof(res));
 		res.cookie('test2', 'test2');
 
 		// get a unqiue identifier for the request being served

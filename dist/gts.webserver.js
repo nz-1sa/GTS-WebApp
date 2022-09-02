@@ -205,6 +205,7 @@ class WebServerHelper {
         return __awaiter(this, void 0, void 0, function* () {
             let timeStart = new Date().getTime();
             var response = new WebResponse(false, '', 'Only Initialised', '');
+            console.log(typeof (res));
             res.cookie('test2', 'test2');
             // get a unqiue identifier for the request being served
             let uuid = yield this.getUUID();
