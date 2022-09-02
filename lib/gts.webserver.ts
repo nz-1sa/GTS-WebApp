@@ -387,6 +387,9 @@ export class Cookie{
 	}
 	
 	public getOptions(): object{
+		console.log('we have');
+		console.log(this.expires);
+		console.log(new Date(0));
 		if(this.expires == new Date(0)){
 			console.log('trying to set session cookie');
 			if(this.domain.length > 0){

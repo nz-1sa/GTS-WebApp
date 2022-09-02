@@ -417,6 +417,9 @@ class Cookie {
         this.secure = pSecure !== null && pSecure !== void 0 ? pSecure : false;
     }
     getOptions() {
+        console.log('we have');
+        console.log(this.expires);
+        console.log(new Date(0));
         if (this.expires == new Date(0)) {
             console.log('trying to set session cookie');
             if (this.domain.length > 0) {
