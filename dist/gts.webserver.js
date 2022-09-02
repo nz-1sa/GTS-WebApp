@@ -60,6 +60,7 @@ class WebServerHelper {
     registerHandlerUnchecked(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
             webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
+                res.cookie('test', 'test');
                 yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
             }));
         });
