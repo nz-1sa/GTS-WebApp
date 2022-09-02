@@ -410,12 +410,8 @@ class Cookie {
         this.domain = ''; // domain of cookie
         this.name = pName;
         this.value = pValue;
-        if (pExpires) {
-            this.expires = pExpires;
-        }
-        if (pDomain) {
-            this.domain = pDomain;
-        }
+        this.expires = pExpires !== null && pExpires !== void 0 ? pExpires : new Date(0);
+        this.domain = pDomain !== null && pDomain !== void 0 ? pDomain : '';
         this.path = pPath !== null && pPath !== void 0 ? pPath : '/';
         this.httpOnly = pHttpOnly !== null && pHttpOnly !== void 0 ? pHttpOnly : false;
         this.secure = pSecure !== null && pSecure !== void 0 ? pSecure : false;

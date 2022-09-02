@@ -379,8 +379,8 @@ export class Cookie{
 	constructor(pName:string, pValue:string, pExpires?:Date, pDomain?:string, pPath?:string, pHttpOnly?:boolean, pSecure?:boolean){
 		this.name = pName;
 		this.value = pValue;
-		if(pExpires){ this.expires = pExpires; }
-		if(pDomain){ this.domain = pDomain; }
+		this.expires = pExpires ?? new Date(0);
+		this.domain = pDomain ?? '';
 		this.path = pPath ?? '/';
 		this.httpOnly = pHttpOnly ?? false;
 		this.secure = pSecure ?? false;
