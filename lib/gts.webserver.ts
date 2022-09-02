@@ -165,9 +165,6 @@ export class WebServerHelper{
 		let timeStart:number = new Date().getTime();
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
 		
-		console.log(typeof(res));
-		res.cookie('test2', 'test2');
-
 		// get a unqiue identifier for the request being served
 		let uuid:string = await this.getUUID();
 		
@@ -193,8 +190,16 @@ export class WebServerHelper{
 				paramVals.push(val);
 				logParams.push(`${name}=${val}`);
 			}
-			// get the response for the request and send it
+			// get the response for the request
 			response = await work(uuid, res, ...paramVals);
+			// set any cookies specified for the response
+			if(response.cookies.length > 0){
+				for(var i:number=0; i<response.cookies.length; i++){
+					let c: Cookie = response.cookies[i];
+					res.cookie(c.name, c.value, c.getOptions());
+				}
+			}
+			//send the response
 			res.send(response.toString());
 		} catch (err:any){
 			// show and record any error encounted
@@ -356,6 +361,39 @@ export class WebServerHelper{
 	}
 }
 
+// allow web responses to set cookies
+export class Cookie{
+	public name: string;		// name of cookie
+	public value: string;		// value of cookie
+	public expires: Date = new Date(0);		// expiry date of cookie, if not specified creates a session cookie
+	public domain: string = '';	// domain of cookie
+	public path: string;		// path for cookie, defaults to /
+	public httpOnly: boolean;	// client script can not read httpOnly cookies
+	public secure: boolean;		// cookie is only used with https
+	
+	constructor(pName:string, pValue:string);
+	constructor(pName:string, pValue:string, pExpires:Date);
+	constructor(pName:string, pValue:string, pExpires:Date, pDomain:string);
+	constructor(pName:string, pValue:string, pExpires:Date, pDomain:string, pPath:string);
+	constructor(pName:string, pValue:string, pExpires:Date, pDomain:string, pPath:string, pHttpOnly:boolean);
+	constructor(pName:string, pValue:string, pExpires?:Date, pDomain?:string, pPath?:string, pHttpOnly?:boolean, pSecure?:boolean){
+		this.name = pName;
+		this.value = pValue;
+		if(pExpires){ this.expires = pExpires; }
+		if(pDomain){ this.domain = pDomain; }
+		this.path = pPath ?? '/';
+		this.httpOnly = pHttpOnly ?? false;
+		this.secure = pSecure ?? false;
+	}
+	
+	public getOptions(): object{
+		if(this.domain.length > 0){
+			return {expires: this.expires == new Date(0)?0:this.expires, domain:this.domain, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+		}
+		return {expires: this.expires == new Date(0)?0:this.expires, path:this.path, httpOnly:this.httpOnly, secure:this.secure};
+	}
+}
+
 // When using await Webserver.handleRequest to process web requests, WebResponse is the format that worker functions provide the data to return
 // It also defines the JSON wrapper of the returned data
 export class WebResponse{
@@ -363,12 +401,14 @@ export class WebResponse{
 	errorMessage: string;
 	logMessage: string;
 	data: string;
+	cookies: Cookie[];
 
-	constructor(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string){
+	constructor(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string, pSetCookies?: Cookie[]){
 		this.success = pSuccess;
 		this.errorMessage = pErrorMessage;
 		this.logMessage = pLogMessage;
 		this.data = pData;
+		this.cookies = pSetCookies ?? [];
 	}
 }
 // JSON to send a response to the client

@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.Weblog = exports.WebResponse = exports.WebServerHelper = void 0;
+exports.DB = exports.Weblog = exports.WebResponse = exports.Cookie = exports.WebServerHelper = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
@@ -205,8 +205,6 @@ class WebServerHelper {
         return __awaiter(this, void 0, void 0, function* () {
             let timeStart = new Date().getTime();
             var response = new WebResponse(false, '', 'Only Initialised', '');
-            console.log(typeof (res));
-            res.cookie('test2', 'test2');
             // get a unqiue identifier for the request being served
             let uuid = yield this.getUUID();
             // return an error if we could not get an uuid
@@ -230,8 +228,16 @@ class WebServerHelper {
                     paramVals.push(val);
                     logParams.push(`${name}=${val}`);
                 }
-                // get the response for the request and send it
+                // get the response for the request
                 response = yield work(uuid, res, ...paramVals);
+                // set any cookies specified for the response
+                if (response.cookies.length > 0) {
+                    for (var i = 0; i < response.cookies.length; i++) {
+                        let c = response.cookies[i];
+                        res.cookie(c.name, c.value, c.getOptions());
+                    }
+                }
+                //send the response
                 res.send(response.toString());
             }
             catch (err) {
@@ -397,14 +403,40 @@ class WebServerHelper {
     }
 }
 exports.WebServerHelper = WebServerHelper;
+// allow web responses to set cookies
+class Cookie {
+    constructor(pName, pValue, pExpires, pDomain, pPath, pHttpOnly, pSecure) {
+        this.expires = new Date(0); // expiry date of cookie, if not specified creates a session cookie
+        this.domain = ''; // domain of cookie
+        this.name = pName;
+        this.value = pValue;
+        if (pExpires) {
+            this.expires = pExpires;
+        }
+        if (pDomain) {
+            this.domain = pDomain;
+        }
+        this.path = pPath !== null && pPath !== void 0 ? pPath : '/';
+        this.httpOnly = pHttpOnly !== null && pHttpOnly !== void 0 ? pHttpOnly : false;
+        this.secure = pSecure !== null && pSecure !== void 0 ? pSecure : false;
+    }
+    getOptions() {
+        if (this.domain.length > 0) {
+            return { expires: this.expires == new Date(0) ? 0 : this.expires, domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
+        }
+        return { expires: this.expires == new Date(0) ? 0 : this.expires, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
+    }
+}
+exports.Cookie = Cookie;
 // When using await Webserver.handleRequest to process web requests, WebResponse is the format that worker functions provide the data to return
 // It also defines the JSON wrapper of the returned data
 class WebResponse {
-    constructor(pSuccess, pErrorMessage, pLogMessage, pData) {
+    constructor(pSuccess, pErrorMessage, pLogMessage, pData, pSetCookies) {
         this.success = pSuccess;
         this.errorMessage = pErrorMessage;
         this.logMessage = pLogMessage;
         this.data = pData;
+        this.cookies = pSetCookies !== null && pSetCookies !== void 0 ? pSetCookies : [];
     }
 }
 exports.WebResponse = WebResponse;

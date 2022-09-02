@@ -20,12 +20,28 @@ export declare class WebServerHelper {
     private requireId;
     private requireCustom;
 }
+export declare class Cookie {
+    name: string;
+    value: string;
+    expires: Date;
+    domain: string;
+    path: string;
+    httpOnly: boolean;
+    secure: boolean;
+    constructor(pName: string, pValue: string);
+    constructor(pName: string, pValue: string, pExpires: Date);
+    constructor(pName: string, pValue: string, pExpires: Date, pDomain: string);
+    constructor(pName: string, pValue: string, pExpires: Date, pDomain: string, pPath: string);
+    constructor(pName: string, pValue: string, pExpires: Date, pDomain: string, pPath: string, pHttpOnly: boolean);
+    getOptions(): object;
+}
 export declare class WebResponse {
     success: boolean;
     errorMessage: string;
     logMessage: string;
     data: string;
-    constructor(pSuccess: boolean, pErrorMessage: string, pLogMessage: string, pData: string);
+    cookies: Cookie[];
+    constructor(pSuccess: boolean, pErrorMessage: string, pLogMessage: string, pData: string, pSetCookies?: Cookie[]);
 }
 export declare class Weblog {
     id: number;
