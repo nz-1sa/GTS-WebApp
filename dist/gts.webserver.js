@@ -417,20 +417,10 @@ class Cookie {
         this.secure = pSecure !== null && pSecure !== void 0 ? pSecure : false;
     }
     getOptions() {
-        console.log(this.expires.getTime());
-        console.log(new Date(0).getTime());
-        if (this.expires.getTime() == 0) {
-            console.log('trying to set session cookie');
-            if (this.domain.length > 0) {
-                return { domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
-            }
-            return { path: this.path, httpOnly: this.httpOnly, secure: this.secure };
-        }
-        console.log('trying to set cookie with expiry date');
         if (this.domain.length > 0) {
-            return { expires: this.expires, domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
+            return { expires: this.expires.getTime() == 0 ? 0 : this.expires, domain: this.domain, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
         }
-        return { expires: this.expires, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
+        return { expires: this.expires.getTime() == 0 ? 0 : this.expires, path: this.path, httpOnly: this.httpOnly, secure: this.secure };
     }
 }
 exports.Cookie = Cookie;
