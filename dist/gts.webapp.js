@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Telegram = exports.fetchJSON = exports.getServerMAC = exports.WrappedResult = exports.WebResponse = exports.Threading = exports.WS = exports.DBCore = exports.UUID = exports.GTS = void 0;
+exports.Telegram = exports.fetchJSON = exports.getServerMAC = exports.WrappedResult = exports.WebResponse = exports.Captcha = exports.Threading = exports.WS = exports.DBCore = exports.UUID = exports.GTS = void 0;
 const axios_1 = __importDefault(require("axios"));
 const getmac_1 = __importDefault(require("getmac"));
 const GTS = __importStar(require("./gts"));
@@ -45,6 +45,7 @@ exports.UUID = __importStar(require("./gts.uuid"));
 exports.DBCore = __importStar(require("./gts.db"));
 exports.WS = __importStar(require("./gts.webserver"));
 exports.Threading = __importStar(require("./gts.threading"));
+exports.Captcha = __importStar(require("./gts.captcha"));
 // quicker reference to commly used types
 var gts_webserver_1 = require("./gts.webserver");
 Object.defineProperty(exports, "WebResponse", { enumerable: true, get: function () { return gts_webserver_1.WebResponse; } });

@@ -4,6 +4,7 @@ export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
 export * as Threading from "./gts.threading";
+export * as Captcha from "./gts.captcha";
 export { WebResponse } from "./gts.webserver";
 export declare class WrappedResult<T> extends GTS.DM.WrappedResult<T> {
 }
