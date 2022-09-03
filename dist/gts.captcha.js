@@ -46,7 +46,7 @@ const questionBase = [
     "What number is coloured blue\nin this animated seq:"
 ];
 function attachCaptcha(web, webapp) {
-    web.registerHandler(webapp, '/captcha', [], function (uuid) {
+    web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid) {
         return __awaiter(this, void 0, void 0, function* () {
             let answer = drawCaptcha(uuid);
             return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${uuid}.gif">`, [new WS.Cookie('session', uuid)]);

@@ -16,7 +16,7 @@ const questionBase: string[]  = [
 	];
 
 export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application):void{
-	web.registerHandler(webapp, '/captcha', [], async function(uuid:string){
+	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string){
 		let answer:number = drawCaptcha(uuid);
 		return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${uuid}.gif">`, [new WS.Cookie('session',uuid)]);
 	});
