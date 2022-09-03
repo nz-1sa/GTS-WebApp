@@ -191,7 +191,7 @@ export class WebServerHelper{
 				logParams.push(`${name}=${val}`);
 			}
 			// get the response for the request
-			response = await work(uuid, ...paramVals);
+			response = await work(uuid, req.cookies, ...paramVals);
 			// set any cookies specified for the response
 			if(response.cookies.length > 0){
 				for(var i:number=0; i<response.cookies.length; i++){

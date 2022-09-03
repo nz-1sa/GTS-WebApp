@@ -229,7 +229,7 @@ class WebServerHelper {
                     logParams.push(`${name}=${val}`);
                 }
                 // get the response for the request
-                response = yield work(uuid, ...paramVals);
+                response = yield work(uuid, req.cookies, ...paramVals);
                 // set any cookies specified for the response
                 if (response.cookies.length > 0) {
                     for (var i = 0; i < response.cookies.length; i++) {
