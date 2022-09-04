@@ -1,3 +1,4 @@
+import * as GTS from "./gts";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
 
@@ -16,7 +17,10 @@ const questionBase: string[]  = [
 	];
 
 export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application):void{
-	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string){
+	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string, ip:string, cookies:GTS.DM.HashTable<string>){
+		if(cookies['session'] && cookies['session'].length == 36){
+			return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Previously Drawn ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
+		}
 		let answer:number = drawCaptcha(uuid);
 		return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${uuid}.gif">`, [new WS.Cookie('session',uuid)]);
 	});
