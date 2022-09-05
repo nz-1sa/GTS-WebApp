@@ -35,6 +35,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DB = exports.Session = exports.SessionStatus = exports.attachCaptcha = exports.isLoggedIn = exports.hasSession = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
+const UUID = __importStar(require("./gts.uuid"));
 const WS = __importStar(require("./gts.webserver"));
 var crypto = require('crypto');
 const GIFEncoder = require('gifencoder');
@@ -103,13 +104,26 @@ function attachCaptcha(web, webapp) {
                 }
                 return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Previously Drawn ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
             }
-            let answer = drawCaptcha(uuid);
-            return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${uuid}.gif">`, [new WS.Cookie('session', uuid)]);
+            let now = new Date();
+            const loopSafety = 20;
+            let loopIteration = 1;
+            let sessionId = uuid;
+            while (!DB.isSessionIdUnique(uuid, sessionId) && loopIteration <= loopSafety) {
+                console.log('handling sessionId clash');
+                sessionId = yield UUID.newUUID();
+                loopIteration++;
+            }
+            if (loopIteration == loopSafety) {
+                return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
+            }
+            DB.addSession(uuid, sessionId, now, now, requestIp, SessionStatus.Initialised);
+            let answer = drawCaptcha(sessionId);
+            return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
         });
     });
 }
 exports.attachCaptcha = attachCaptcha;
-function drawCaptcha(uuid) {
+function drawCaptcha(sessionId) {
     // decide which question we are asking
     let questionId = getRandom(0, questionBase.length - 1);
     const numberCount = 5; // how many numbers are in the sequence
@@ -204,7 +218,7 @@ function drawCaptcha(uuid) {
     }
     encoder.finish();
     const buf = encoder.out.getData();
-    fs.writeFile(`public/captchas/${uuid}.gif`, buf, function (err) {
+    fs.writeFile(`public/captchas/${sessionId}.gif`, buf, function (err) {
         // animated GIF written
         if (err != null) {
             console.log('error');
@@ -328,6 +342,22 @@ var DB;
         });
     }
     DB.getSession = getSession;
+    function isSessionIdUnique(uuid, sessionId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('getSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('SELECT id FROM sessions WHERE sessionId = $1;', [sessionId]);
+            return retval.setData(res.rowCount == 0);
+        });
+    }
+    DB.isSessionIdUnique = isSessionIdUnique;
     function addSession(uuid, sessionId, created, lastSeen, ip, status) {
         return __awaiter(this, void 0, void 0, function* () {
             let retval = new GTS.DM.WrappedResult();

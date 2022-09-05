@@ -1,5 +1,6 @@
 import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
+import * as UUID from "./gts.uuid";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
 var crypto = require('crypto');
@@ -51,7 +52,7 @@ export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application
 		const loopSafety:number = 20;
 		let loopIteration:number = 1;
 		let sessionId:string = uuid;
-		while(!DB.isSessionIdUnique(sessionId) && loopIteration<=loopSafety){
+		while(!DB.isSessionIdUnique(uuid, sessionId) && loopIteration<=loopSafety){
 			console.log('handling sessionId clash');
 			sessionId = await UUID.newUUID();
 			loopIteration++;
@@ -282,7 +283,7 @@ export namespace DB{
 		return retval.setData( s );
 	}
 	
-	export async function isSessionIdUnique(uuid:string, sessionId:string): Promise<GTS.DM.WrappeedResult<boolean>>{
+	export async function isSessionIdUnique(uuid:string, sessionId:string): Promise<GTS.DM.WrappedResult<boolean>>{
 		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'getSession', uuid );
 		if( fetchConn.error ) {

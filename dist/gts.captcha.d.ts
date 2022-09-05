@@ -34,6 +34,7 @@ export declare class Session {
 export declare namespace DB {
     function fetchAllSession(uuid: string): Promise<GTS.DM.WrappedResult<Session[]>>;
     function getSession(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<Session>>;
+    function isSessionIdUnique(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<boolean>>;
     function addSession(uuid: string, sessionId: string, created: Date, lastSeen: Date, ip: string, status: number): Promise<GTS.DM.WrappedResult<Session>>;
     function updateSession(uuid: string, id: number, sessionId: string, created: Date, lastSeen: Date, ip: string, status: number, chkSum: string): Promise<GTS.DM.WrappedResult<Session>>;
     function deleteSession(uuid: string, id: number): Promise<GTS.DM.WrappedResult<void>>;
