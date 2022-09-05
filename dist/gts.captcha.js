@@ -32,8 +32,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.attachCaptcha = void 0;
+exports.DB = exports.Session = exports.SessionStatus = exports.attachCaptcha = exports.isLoggedIn = exports.hasSession = void 0;
+const GTS = __importStar(require("./gts"));
+const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
+var crypto = require('crypto');
 const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
@@ -45,6 +48,51 @@ const questionBase = [
     "What number is coloured red\nin this animated seq:",
     "What number is coloured blue\nin this animated seq:"
 ];
+function hasSession(uuid, requestIp, cookies) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!cookies['session']) {
+            console.log('no session cookie at hasSession check');
+            return [false, undefined];
+        }
+        if (cookies['session'].length != 36) {
+            console.log('incorrect session length at hasSession check');
+            return [false, undefined];
+        }
+        let ws = yield DB.getSession(uuid, cookies['session']);
+        if (ws.error) {
+            console.log('failed to get session from db ' + ws.message);
+            return [false, undefined];
+        }
+        if (ws.data == null) {
+            console.log('null session from db');
+            return [false, undefined];
+        }
+        let s = ws.data;
+        if (s.ip != requestIp) {
+            console.log('ip mismatch at hasSession check');
+            return [false, undefined];
+        }
+        if (s.status == SessionStatus.Expired) {
+            console.log('expired session at hasSession check');
+            return [false, undefined];
+        }
+        return [true, s];
+    });
+}
+exports.hasSession = hasSession;
+function isLoggedIn(uuid, requestIp, cookies) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const [hs, s] = yield hasSession(uuid, requestIp, cookies);
+        if (!hs) {
+            return false;
+        }
+        if (!s) {
+            return false;
+        }
+        return (s.status == SessionStatus.LoggedIn);
+    });
+}
+exports.isLoggedIn = isLoggedIn;
 function attachCaptcha(web, webapp) {
     web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid, ip, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -161,3 +209,183 @@ function drawCaptcha(uuid) {
     });
     return answer;
 }
+var SessionStatus;
+(function (SessionStatus) {
+    SessionStatus[SessionStatus["Initialised"] = 1] = "Initialised";
+    SessionStatus[SessionStatus["LoggedIn"] = 2] = "LoggedIn";
+    SessionStatus[SessionStatus["LoggedOut"] = 3] = "LoggedOut";
+    SessionStatus[SessionStatus["Expired"] = 4] = "Expired";
+})(SessionStatus = exports.SessionStatus || (exports.SessionStatus = {}));
+class Session {
+    constructor(pId, pSessionId, pCreated, pLastSeen, pIp, pStatus, pChkSum) {
+        this.id = pId;
+        this.sessionId = pSessionId;
+        this.created = pCreated;
+        this.lastSeen = pLastSeen;
+        this.ip = pIp;
+        this.status = pStatus;
+        this.chkSum = pChkSum;
+    }
+    genHash() {
+        var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status });
+        var hsh = crypto.createHash('sha1').update(j).digest('base64');
+        return hsh;
+    }
+    toString() {
+        return JSON.stringify({ id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), chkSum: this.chkSum });
+    }
+    toJSON() {
+        return { id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), chkSum: this.chkSum };
+    }
+    testId() {
+        return this.id >= 0 && this.id <= 2147483600;
+    }
+    testSessionId() {
+        return this.sessionId.length >= 36 && this.sessionId.length <= 36;
+    }
+    testCreated() {
+        return true;
+    }
+    testLastSeen() {
+        return true;
+    }
+    testIp() {
+        return this.ip.length >= 3 && this.ip.length <= 39;
+    }
+    testStatus() {
+        return [1, 2, 3, 4].indexOf(this.status) >= 0;
+    }
+    testChkSum() {
+        return true;
+    }
+    static fromStrings(id, sessionId, created, lastSeen, ip, status, chkSum) {
+        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(sessionId), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(created), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(lastSeen), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(ip), new RegExp("^[0-9]+$", "g").test(status), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+        if (!regexTests.every(Boolean)) {
+            // detail invalid value
+            let paramNames = ["id", "sessionId", "created", "lastSeen", "ip", "status", "chkSum"];
+            for (var i = 0; i < regexTests.length; i++) {
+                if (!regexTests[i]) {
+                    console.log('posted value for ' + paramNames[i] + ' fails regex check');
+                }
+            }
+            return undefined;
+        }
+        let session = new Session(parseInt(id), (sessionId), new Date(created), new Date(lastSeen), (ip), parseInt(status), (chkSum));
+        if (session.testId() && session.testSessionId() && session.testCreated() && session.testLastSeen() && session.testIp() && session.testStatus() && session.testChkSum()) {
+            return session;
+        }
+        //TODO: detail invalid value
+        return undefined;
+    }
+}
+exports.Session = Session;
+var DB;
+(function (DB) {
+    function fetchAllSession(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let retvalData = [];
+            let fetchConn = yield DBCore.getConnection('fetchAllSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('SELECT id, sessionId, created, lastSeen, ip, status, chkSum FROM sessions;');
+            if (res.rowCount == 0) {
+                return retval.setData(retvalData);
+            } // handle empty table
+            for (let i = 0; i < res.rowCount; i++) {
+                retvalData.push(new Session(res.rows[i].id, res.rows[i].sessionid, res.rows[i].created, res.rows[i].lastseen, res.rows[i].ip, res.rows[i].status, res.rows[i].chksum));
+            }
+            return retval.setData(retvalData);
+        });
+    }
+    DB.fetchAllSession = fetchAllSession;
+    function getSession(uuid, sessionId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('getSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('SELECT id, created, lastSeen, ip, status, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
+            if (res.rowCount == 0) {
+                return retval.setError('Session not found.');
+            }
+            let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].chksum);
+            return retval.setData(s);
+        });
+    }
+    DB.getSession = getSession;
+    function addSession(uuid, sessionId, created, lastSeen, ip, status) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('addSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            let obj = new Session(0, sessionId, created, lastSeen, ip, status, '');
+            let chksum = obj.genHash();
+            const res = yield client.query('CALL addSession($1,$2,$3,$4,$5,$6,$7);', [sessionId, created, lastSeen, ip, status, chksum, 0]);
+            if (res.rowCount == 0) {
+                return retval.setError('Session not added.');
+            }
+            obj.id = res.rows[0].insertedid;
+            obj.chkSum = chksum;
+            return retval.setData(obj);
+        });
+    }
+    DB.addSession = addSession;
+    function updateSession(uuid, id, sessionId, created, lastSeen, ip, status, chkSum) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('updateSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            let obj = new Session(id, sessionId, created, lastSeen, ip, status, chkSum);
+            let newChksum = obj.genHash();
+            const res = yield client.query('CALL updateSession($1,$2,$3,$4,$5,$6,$7,$8,$9);', [id, sessionId, created, lastSeen, ip, status, newChksum, chkSum, 0]);
+            if (res.rowCount == 0) {
+                return retval.setError('Session not updated. 0 row count.');
+            }
+            if (res.rows[0].updatestatus == 0) {
+                return retval.setError('Session not updated. ChkSum failed.');
+            }
+            obj.chkSum = newChksum;
+            return retval.setData(obj);
+        });
+    }
+    DB.updateSession = updateSession;
+    function deleteSession(uuid, id) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('deleteSession', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            yield client.query('DELETE FROM sessions WHERE id=$1;', [id]);
+            return retval.setData();
+        });
+    }
+    DB.deleteSession = deleteSession;
+})(DB = exports.DB || (exports.DB = {}));
