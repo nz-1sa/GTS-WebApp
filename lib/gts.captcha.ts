@@ -46,12 +46,27 @@ export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application
 			}
 			return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Previously Drawn ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
 		}
-		let answer:number = drawCaptcha(uuid);
-		return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${uuid}.gif">`, [new WS.Cookie('session',uuid)]);
+		let now:Date = new Date();
+		
+		const loopSafety:number = 20;
+		let loopIteration:number = 1;
+		let sessionId:string = uuid;
+		while(!DB.isSessionIdUnique(sessionId) && loopIteration<=loopSafety){
+			console.log('handling sessionId clash');
+			sessionId = await UUID.newUUID();
+			loopIteration++;
+		}
+		if(loopIteration == loopSafety){
+			return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
+		}
+		
+		DB.addSession(uuid, sessionId, now, now, requestIp, SessionStatus.Initialised);
+		let answer:number = drawCaptcha(sessionId);
+		return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
 	});
 }
 
-function drawCaptcha(uuid:string){
+function drawCaptcha(sessionId:string){
 	// decide which question we are asking
 	let questionId:number = getRandom(0,questionBase.length-1);
 	
@@ -142,7 +157,7 @@ function drawCaptcha(uuid:string){
 	}
 	encoder.finish();
 	const buf = encoder.out.getData();
-	fs.writeFile(`public/captchas/${uuid}.gif`, buf, function (err:any) {
+	fs.writeFile(`public/captchas/${sessionId}.gif`, buf, function (err:any) {
 		// animated GIF written
 		if(err != null){
 			console.log('error');
@@ -265,6 +280,20 @@ export namespace DB{
 		if( res.rowCount == 0 ) { return retval.setError( 'Session not found.' ); }
 		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].chksum);
 		return retval.setData( s );
+	}
+	
+	export async function isSessionIdUnique(uuid:string, sessionId:string): Promise<GTS.DM.WrappeedResult<boolean>>{
+		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'getSession', uuid );
+		if( fetchConn.error ) {
+			return retval.setError( 'DB Connection error\n' + fetchConn.message );
+		}
+		if( fetchConn.data == null ) {
+			return retval.setError( 'DB Connection NULL error' );
+		}
+		let client:DBCore.Client = fetchConn.data;
+		const res = await client.query( 'SELECT id FROM sessions WHERE sessionId = $1;',[sessionId] );
+		return retval.setData( res.rowCount == 0 );
 	}
 
 	export async function addSession(uuid:string, sessionId:string, created:Date, lastSeen:Date, ip:string, status:number): Promise<GTS.DM.WrappedResult<Session>> {
