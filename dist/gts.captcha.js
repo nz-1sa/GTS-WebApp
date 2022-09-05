@@ -94,9 +94,13 @@ function isLoggedIn(uuid, requestIp, cookies) {
 }
 exports.isLoggedIn = isLoggedIn;
 function attachCaptcha(web, webapp) {
-    web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid, ip, cookies) {
+    web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (cookies['session'] && cookies['session'].length == 36) {
+            const [hs, s] = yield hasSession(uuid, requestIp, cookies);
+            if (hs && s) {
+                if (s.status == SessionStatus.LoggedIn) {
+                    return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`, `Already logged in`, []);
+                }
                 return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Previously Drawn ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
             }
             let answer = drawCaptcha(uuid);

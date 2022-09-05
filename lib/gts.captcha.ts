@@ -34,13 +34,16 @@ export async function isLoggedIn(uuid:string, requestIp:string, cookies:GTS.DM.H
 	const [hs, s] = await hasSession(uuid, requestIp, cookies);
 	if(!hs){ return false; }
 	if(!s){ return false; }
-	return (s!.status ==SessionStatus.LoggedIn);
+	return (s!.status == SessionStatus.LoggedIn);
 }
 
-
 export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application):void{
-	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string, ip:string, cookies:GTS.DM.HashTable<string>){
-		if(cookies['session'] && cookies['session'].length == 36){
+	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+		const [hs, s] = await hasSession(uuid, requestIp, cookies);
+		if(hs && s){
+			if(s!.status == SessionStatus.LoggedIn){
+				return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`,`Already logged in`, []);
+			}
 			return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Previously Drawn ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
 		}
 		let answer:number = drawCaptcha(uuid);
