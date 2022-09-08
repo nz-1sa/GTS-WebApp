@@ -94,6 +94,7 @@ function isLoggedIn(uuid, requestIp, cookies) {
     });
 }
 exports.isLoggedIn = isLoggedIn;
+//TODO: rename attachWebInterface as this will do more than captcha, is becoming more than just captcha, will be full session management
 function attachCaptcha(web, webapp) {
     web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {

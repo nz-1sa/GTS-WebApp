@@ -38,6 +38,7 @@ export async function isLoggedIn(uuid:string, requestIp:string, cookies:GTS.DM.H
 	return (s!.status == SessionStatus.LoggedIn);
 }
 
+//TODO: rename attachWebInterface as this will do more than captcha, is becoming more than just captcha, will be full session management
 export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application):void{
 	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
 		const [hs, s] = await hasSession(uuid, requestIp, cookies);
