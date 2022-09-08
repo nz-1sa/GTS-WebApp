@@ -9,6 +9,7 @@ export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
 export * as Threading from "./gts.threading";
 export * as Captcha from "./gts.captcha";
+export * as Encodec from "./gts.encodec";
 
 // quicker reference to commly used types
 export {WebResponse} from "./gts.webserver";
