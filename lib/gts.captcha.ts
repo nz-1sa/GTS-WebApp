@@ -322,7 +322,7 @@ export class Session{
 			return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
 		});
 		
-		webapp.get( '/login', ( req, res ) => res.sendFile( WEB.getFile( 'login.html' ) ) );
+		webapp.get( '/login', ( req, res ) => res.sendFile( WEB.getFile( '../../login.html' ) ) );
 		
 		web.registerHandlerUnchecked(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
 			// check that there is an open session to log in to

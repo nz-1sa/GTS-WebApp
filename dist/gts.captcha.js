@@ -440,7 +440,7 @@ class Session {
                 return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
             });
         });
-        webapp.get('/login', (req, res) => res.sendFile(WEB.getFile('login.html')));
+        webapp.get('/login', (req, res) => res.sendFile(WEB.getFile('../../login.html')));
         web.registerHandlerUnchecked(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
             return __awaiter(this, void 0, void 0, function* () {
                 // check that there is an open session to log in to
