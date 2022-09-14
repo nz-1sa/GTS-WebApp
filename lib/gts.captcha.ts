@@ -204,7 +204,7 @@ export class Session{
 		if( fetchConn.error ) { return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
-		const res = await client.query( 'SELECT id, created, lastSeen, ip, status, chkSum FROM sessions WHERE sessionId = $1;',[sessionId] );
+		const res = await client.query( 'SELECT id, created, lastSeen, ip, status, captcha, nonce, password, chkSum FROM sessions WHERE sessionId = $1;',[sessionId] );
 		if( res.rowCount == 0 ) { return retval.setError( 'Session not found.' ); }
 		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].chksum);
 		//TODO: update last seen

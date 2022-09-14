@@ -283,7 +283,7 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            const res = yield client.query('SELECT id, created, lastSeen, ip, status, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
+            const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not found.');
             }
