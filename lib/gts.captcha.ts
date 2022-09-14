@@ -387,6 +387,7 @@ export class Session{
 		if( ws.error ) { console.log('failed to get session from db '+ws.message ); return [false,undefined];}
 		if( ws.data == null ) { console.log('null session from db'); return [false,undefined]; }
 		let s: Session = ws.data;
+		console.log({wsdata:ws.data});
 		if(s.ip != requestIp){ console.log('ip mismatch at hasSession check'); return [false,undefined]; }
 		if(s.status == SessionStatus.Expired){ console.log('expired session at hasSession check'); return [false,undefined]; }
 		return [true,s];

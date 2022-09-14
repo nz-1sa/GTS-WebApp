@@ -510,6 +510,7 @@ class Session {
                 return [false, undefined];
             }
             let s = ws.data;
+            console.log({ wsdata: ws.data });
             if (s.ip != requestIp) {
                 console.log('ip mismatch at hasSession check');
                 return [false, undefined];
