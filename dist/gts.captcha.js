@@ -103,7 +103,6 @@ class Session {
                     return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
                 }
                 let sess = s;
-                console.log({ sess: sess });
                 if (sess.status != SessionStatus.Initialised) {
                     return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
                 }
@@ -123,8 +122,10 @@ class Session {
                     console.log('failed NaN check');
                     return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`, '', []);
                 }
-                if (parseInt(decoded) < new Date().getTime() - 1000) {
+                let timeTolerance = new Date().getTime() - 1000;
+                if (parseInt(decoded) < timeTolerance) {
                     return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
+                    console.log({ toold: timeTolerance });
                 }
                 // generate password and nonce for the session
                 sess.password = yield Session.genSessionPassword();
@@ -510,7 +511,6 @@ class Session {
                 return [false, undefined];
             }
             let s = ws.data;
-            console.log({ wsdata: ws.data });
             if (s.ip != requestIp) {
                 console.log('ip mismatch at hasSession check');
                 return [false, undefined];

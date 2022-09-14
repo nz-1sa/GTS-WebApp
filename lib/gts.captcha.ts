@@ -82,7 +82,6 @@ export class Session{
 				return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`,'', []);
 			}
 			let sess:Session = s!;
-			console.log({sess:sess});
 			if(sess.status != SessionStatus.Initialised){
 				return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
 			}
@@ -108,8 +107,10 @@ export class Session{
 				console.log('failed NaN check');
 				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`,'', []);
 			}
-			if(parseInt(decoded) < new Date().getTime()-1000 ){
+			let timeTolerance = new Date().getTime()-1000;
+			if(parseInt(decoded) < timeTolerance ){
 				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
+				console.log({toold:timeTolerance});
 			}
 			
 			// generate password and nonce for the session
@@ -387,7 +388,6 @@ export class Session{
 		if( ws.error ) { console.log('failed to get session from db '+ws.message ); return [false,undefined];}
 		if( ws.data == null ) { console.log('null session from db'); return [false,undefined]; }
 		let s: Session = ws.data;
-		console.log({wsdata:ws.data});
 		if(s.ip != requestIp){ console.log('ip mismatch at hasSession check'); return [false,undefined]; }
 		if(s.status == SessionStatus.Expired){ console.log('expired session at hasSession check'); return [false,undefined]; }
 		return [true,s];
