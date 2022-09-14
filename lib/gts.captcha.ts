@@ -90,6 +90,7 @@ export class Session{
 			let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
 			
 			console.log('using debug key to decode');
+			console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
 			
 			// decrypt challenge using knownSaltPassHash and captcha
 			let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
@@ -97,11 +98,13 @@ export class Session{
 			console.log({decoded:decoded});
 			
 			if(!new RegExp("^[0-9]+$", "g").test(decoded)){
+				console.log('failed regex check');
 				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`,'', []);
 			}
 			
 			// verify decrypted challenge content
 			if( parseInt(decoded) == NaN ){
+				console.log('failed NaN check');
 				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`,'', []);
 			}
 			if(parseInt(decoded) < new Date().getTime()-1000 ){
