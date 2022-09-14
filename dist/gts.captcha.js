@@ -94,6 +94,34 @@ function isLoggedIn(uuid, requestIp, cookies) {
     });
 }
 exports.isLoggedIn = isLoggedIn;
+// generate a random characters of the 189 that can be seen, 67 of the possible 256 8bit characters are excluded.
+function randomPassChar() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let x = Math.floor(Math.random() * 222) + 33;
+        let prohibit = [127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 173];
+        if (prohibit.indexOf(x) >= 0) {
+            return randomPassChar();
+        } // recurse to get different char if our random is prohibited
+        return String.fromCharCode(x);
+    });
+}
+// generate a password to use for the session ot reduce the usage and hence attack surface of the users password
+function genSessionPassword() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let passwordChars = new Array(16);
+        function assignRandomChar(index) {
+            return __awaiter(this, void 0, void 0, function* () {
+                passwordChars[index] = yield randomPassChar();
+            });
+        }
+        let promises = [];
+        for (var i = 0; i < passwordChars.length; i++) {
+            promises.push(assignRandomChar(i));
+        }
+        yield Promise.all(promises);
+        return passwordChars.join('');
+    });
+}
 //TODO: rename attachWebInterface as this will do more than captcha, is becoming more than just captcha, will be full session management
 function attachCaptcha(web, webapp) {
     web.registerHandlerUnchecked(webapp, '/captcha', [], function (uuid, requestIp, cookies) {

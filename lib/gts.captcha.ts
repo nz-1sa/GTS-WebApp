@@ -38,6 +38,28 @@ export async function isLoggedIn(uuid:string, requestIp:string, cookies:GTS.DM.H
 	return (s!.status == SessionStatus.LoggedIn);
 }
 
+// generate a random characters of the 189 that can be seen, 67 of the possible 256 8bit characters are excluded.
+async function randomPassChar(): Promise<string>{
+	let x:number = Math.floor(Math.random()*222)+33;
+	let prohibit:number[] = [127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,173];
+	if(prohibit.indexOf(x) >= 0){ return randomPassChar(); } // recurse to get different char if our random is prohibited
+	return String.fromCharCode(x);
+}
+
+// generate a password to use for the session ot reduce the usage and hence attack surface of the users password
+async function genSessionPassword(){
+	let passwordChars = new Array(16);
+	async function assignRandomChar(index:number){
+		passwordChars[index] = await randomPassChar();
+	}
+	let promises = [];
+	for(var i:number=0; i < passwordChars.length; i++){
+		promises.push( assignRandomChar(i) );
+	}
+	await Promise.all(promises);
+	return passwordChars.join('');
+}
+
 //TODO: rename attachWebInterface as this will do more than captcha, is becoming more than just captcha, will be full session management
 export function attachCaptcha(web:WS.WebServerHelper, webapp:Express.Application):void{
 	web.registerHandlerUnchecked(webapp, '/captcha', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
