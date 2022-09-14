@@ -1,9 +1,6 @@
 import * as GTS from "./gts";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
-export declare function hasSession(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<[boolean, Session?]>;
-export declare function isLoggedIn(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<boolean>;
-export declare function attachCaptcha(web: WS.WebServerHelper, webapp: Express.Application): void;
 export declare enum SessionStatus {
     Initialised = 1,
     LoggedIn = 2,
@@ -16,26 +13,27 @@ export declare class Session {
     created: Date;
     lastSeen: Date;
     ip: string;
-    status: number;
+    status: SessionStatus;
+    captcha: number;
+    nonce: number;
+    password: string;
     chkSum: string;
-    constructor(pId: number, pSessionId: string, pCreated: Date, pLastSeen: Date, pIp: string, pStatus: number, pChkSum: string);
+    constructor(pId: number, pSessionId: string, pCreated: Date, pLastSeen: Date, pIp: string, pStatus: SessionStatus, pCaptcha: number, pNonce: number, pPassword: string, pChkSum: string);
     genHash(): string;
     toString(): string;
     toJSON(): object;
-    testId(): boolean;
-    testSessionId(): boolean;
-    testCreated(): boolean;
-    testLastSeen(): boolean;
-    testIp(): boolean;
-    testStatus(): boolean;
-    testChkSum(): boolean;
-    static fromStrings(id: string, sessionId: string, created: string, lastSeen: string, ip: string, status: string, chkSum: string): Session | undefined;
-}
-export declare namespace DB {
-    function fetchAllSession(uuid: string): Promise<GTS.DM.WrappedResult<Session[]>>;
-    function getSession(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<Session>>;
-    function isSessionIdUnique(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<boolean>>;
-    function addSession(uuid: string, sessionId: string, created: Date, lastSeen: Date, ip: string, status: number): Promise<GTS.DM.WrappedResult<Session>>;
-    function updateSession(uuid: string, id: number, sessionId: string, created: Date, lastSeen: Date, ip: string, status: number, chkSum: string): Promise<GTS.DM.WrappedResult<Session>>;
-    function deleteSession(uuid: string, id: number): Promise<GTS.DM.WrappedResult<void>>;
+    verifyValuesAreValid(): [boolean, string];
+    static fromStrings(id: string, sessionId: string, created: string, lastSeen: string, ip: string, status: string, captcha: string, nonce: string, password: string, chkSum: string): Session | null;
+    static isProposedSessionIdUnique(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<boolean>>;
+    static getSessionFromDB(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<Session>>;
+    static fetchAllFromDB(uuid: string): Promise<GTS.DM.WrappedResult<Session[]>>;
+    addToDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;
+    updateDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;
+    deleteFromDB(uuid: string): Promise<GTS.DM.WrappedResult<void>>;
+    initialiseCaptcha(uuid: string, sessionId: string): void;
+    static attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
+    static hasSession(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<[boolean, Session?]>;
+    static isLoggedIn(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<boolean>;
+    private static randomPassChar;
+    private static genSessionPassword;
 }
