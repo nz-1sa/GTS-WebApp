@@ -107,9 +107,14 @@ class Session {
                     return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
                 }
                 //TODO: get knownSaltPassHash for email address from database
-                let knownSaltPassHash = 'TEMP, get from DB';
+                let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
+                console.log('using debug key to decode');
                 // decrypt challenge using knownSaltPassHash and captcha
                 let decoded = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
+                console.log({ decoded: decoded });
+                if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
+                    return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`, '', []);
+                }
                 // verify decrypted challenge content
                 if (parseInt(decoded) == NaN) {
                     return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`, '', []);
