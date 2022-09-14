@@ -82,6 +82,7 @@ export class Session{
 				return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`,'', []);
 			}
 			let sess:Session = s!;
+			console.log({sess:sess});
 			if(sess.status != SessionStatus.Initialised){
 				return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
 			}
