@@ -19,6 +19,7 @@ export declare class Session {
     password: string;
     chkSum: string;
     constructor(pId: number, pSessionId: string, pCreated: Date, pLastSeen: Date, pIp: string, pStatus: SessionStatus, pCaptcha: number, pNonce: number, pPassword: string, pChkSum: string);
+    static attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
     genHash(): string;
     toString(): string;
     toJSON(): object;
@@ -31,7 +32,6 @@ export declare class Session {
     updateDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;
     deleteFromDB(uuid: string): Promise<GTS.DM.WrappedResult<void>>;
     initialiseCaptcha(uuid: string, sessionId: string): void;
-    static attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
     static hasSession(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<[boolean, Session?]>;
     static isLoggedIn(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<boolean>;
     private static randomPassChar;

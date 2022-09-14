@@ -65,6 +65,76 @@ class Session {
         this.password = pPassword;
         this.chkSum = pChkSum;
     }
+    static attachWebInterface(web, webapp) {
+        web.registerHandlerUnchecked(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+                if (hs && s) {
+                    if (s.status == SessionStatus.LoggedIn) {
+                        return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`, `Already logged in`, []);
+                    }
+                    return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
+                }
+                let now = new Date();
+                const loopSafety = 20;
+                let loopIteration = 1;
+                let sessionId = uuid;
+                while (!Session.isProposedSessionIdUnique(uuid, sessionId) && loopIteration <= loopSafety) {
+                    console.log('handling sessionId clash');
+                    sessionId = yield UUID.newUUID();
+                    loopIteration++;
+                }
+                if (loopIteration == loopSafety) {
+                    return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
+                }
+                // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pChkSum:string
+                let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 'NEWnewNEWnewNEWnewNEWnewNEW=');
+                ns.addToDB(uuid);
+                ns.initialiseCaptcha(uuid, sessionId);
+                return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
+            });
+        });
+        webapp.get('/login', (req, res) => res.sendFile(WEB.getFile('../../login.html')));
+        web.registerHandlerUnchecked(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
+            return __awaiter(this, void 0, void 0, function* () {
+                // check that there is an open session to log in to
+                const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+                if (!hs || !s) {
+                    return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
+                }
+                let sess = s;
+                if (sess.status != SessionStatus.Initialised) {
+                    return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
+                }
+                //TODO: get knownSaltPassHash for email address from database
+                let knownSaltPassHash = 'TEMP, get from DB';
+                // decrypt challenge using knownSaltPassHash and captcha
+                let decoded = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
+                // verify decrypted challenge content
+                if (parseInt(decoded) == NaN) {
+                    return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`, '', []);
+                }
+                if (parseInt(decoded) < new Date().getTime() - 1000) {
+                    return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
+                }
+                // generate password and nonce for the session
+                sess.password = yield Session.genSessionPassword();
+                sess.nonce = 1 + Math.random() * 483600;
+                sess.updateDB(uuid);
+                // encrypt and return to client the password to use for the session, and the nonce to start with
+                let plainTextResponse = JSON.stringify({ pass: sess.password, nonce: sess.nonce });
+                let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
+                return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
+            });
+        });
+        //NOTE: requests to the server must be received in the order of nonce
+        //TODO: will need to make a handler to hold and sort them as they arrive to process
+        web.registerHandlerUnchecked(webapp, '/api/talk', ['message'], function (uuid, requestIp, cookies, message) {
+            return __awaiter(this, void 0, void 0, function* () {
+                return new WS.WebResponse(false, "NOT YET IMPLEMENTED", `UUID:${uuid} talk called, but method not yet implemented`, '');
+            });
+        });
+    }
     // base64 sha1 hash of the session's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
     genHash() {
         var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status, captcha: this.captcha, nonce: this.nonce, password: this.password });
@@ -409,76 +479,6 @@ class Session {
                 console.log('error');
                 console.log(err);
             }
-        });
-    }
-    static attachWebInterface(web, webapp) {
-        web.registerHandlerUnchecked(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
-            return __awaiter(this, void 0, void 0, function* () {
-                const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
-                if (hs && s) {
-                    if (s.status == SessionStatus.LoggedIn) {
-                        return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`, `Already logged in`, []);
-                    }
-                    return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
-                }
-                let now = new Date();
-                const loopSafety = 20;
-                let loopIteration = 1;
-                let sessionId = uuid;
-                while (!Session.isProposedSessionIdUnique(uuid, sessionId) && loopIteration <= loopSafety) {
-                    console.log('handling sessionId clash');
-                    sessionId = yield UUID.newUUID();
-                    loopIteration++;
-                }
-                if (loopIteration == loopSafety) {
-                    return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
-                }
-                // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pChkSum:string
-                let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 'NEWnewNEWnewNEWnewNEWnewNEW=');
-                ns.addToDB(uuid);
-                ns.initialiseCaptcha(uuid, sessionId);
-                return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
-            });
-        });
-        webapp.get('/login', (req, res) => res.sendFile(WEB.getFile('../../login.html')));
-        web.registerHandlerUnchecked(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
-            return __awaiter(this, void 0, void 0, function* () {
-                // check that there is an open session to log in to
-                const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
-                if (!hs || !s) {
-                    return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
-                }
-                let sess = s;
-                if (sess.status != SessionStatus.Initialised) {
-                    return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
-                }
-                //TODO: get knownSaltPassHash for email address from database
-                let knownSaltPassHash = 'TEMP, get from DB';
-                // decrypt challenge using knownSaltPassHash and captcha
-                let decoded = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
-                // verify decrypted challenge content
-                if (parseInt(decoded) == NaN) {
-                    return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`, '', []);
-                }
-                if (parseInt(decoded) < new Date().getTime() - 1000) {
-                    return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
-                }
-                // generate password and nonce for the session
-                sess.password = yield Session.genSessionPassword();
-                sess.nonce = 1 + Math.random() * 483600;
-                sess.updateDB(uuid);
-                // encrypt and return to client the password to use for the session, and the nonce to start with
-                let plainTextResponse = JSON.stringify({ pass: sess.password, nonce: sess.nonce });
-                let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
-                return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, encResponse);
-            });
-        });
-        //NOTE: requests to the server must be received in the order of nonce
-        //TODO: will need to make a handler to hold and sort them as they arrive to process
-        web.registerHandlerUnchecked(webapp, '/api/talk', ['message'], function (uuid, requestIp, cookies, message) {
-            return __awaiter(this, void 0, void 0, function* () {
-                return new WS.WebResponse(false, "NOT YET IMPLEMENTED", `UUID:${uuid} talk called, but method not yet implemented`, '');
-            });
         });
     }
     static hasSession(uuid, requestIp, cookies) {
