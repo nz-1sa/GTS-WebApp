@@ -109,18 +109,22 @@ export class Session{
 			}
 			let timeTolerance = new Date().getTime()-1000;
 			if(parseInt(decoded) < timeTolerance ){
-				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
 				console.log({toold:timeTolerance});
+				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
 			}
 			
 			// generate password and nonce for the session
+			console.log('setting session credentials');
 			sess.password = await Session.genSessionPassword();
 			sess.nonce = 1+Math.random()*483600;
 			sess.updateDB(uuid);
+			console.log({sess:sess});
 			
 			// encrypt and return to client the password to use for the session, and the nonce to start with
 			let plainTextResponse = JSON.stringify({pass:sess.password, nonce:sess.nonce});
+			console.log({plainTextResponse:plainTextResponse});
 			let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
+			console.log({encResponse:encResponse});
 			return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
 		});
 		
