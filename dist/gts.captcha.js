@@ -53,7 +53,7 @@ var SessionStatus;
     SessionStatus[SessionStatus["Expired"] = 4] = "Expired";
 })(SessionStatus = exports.SessionStatus || (exports.SessionStatus = {}));
 class Session {
-    constructor(pId, pSessionId, pCreated, pLastSeen, pIp, pStatus, pCaptcha, pNonce, pPassword, pChkSum) {
+    constructor(pId, pSessionId, pCreated, pLastSeen, pIp, pStatus, pCaptcha, pNonce, pPassword, pSeq, pChkSum) {
         this.id = pId;
         this.sessionId = pSessionId;
         this.created = pCreated;
@@ -63,6 +63,7 @@ class Session {
         this.captcha = pCaptcha;
         this.nonce = pNonce;
         this.password = pPassword;
+        this.seq = pSeq;
         this.chkSum = pChkSum;
     }
     static attachWebInterface(web, webapp) {
@@ -87,8 +88,8 @@ class Session {
                 if (loopIteration == loopSafety) {
                     return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
                 }
-                // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pChkSum:string
-                let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 'NEWnewNEWnewNEWnewNEWnewNEW=');
+                // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
+                let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
                 ns.addToDB(uuid);
                 ns.initialiseCaptcha(uuid, sessionId);
                 return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
@@ -131,8 +132,10 @@ class Session {
                 }
                 // generate password and nonce for the session
                 console.log('setting session credentials');
+                //sess.statis = SessionStatus.LoggedIn;
                 sess.password = yield Session.genSessionPassword();
                 sess.nonce = Math.floor(1 + Math.random() * 483600);
+                sess.seq = 1;
                 sess.updateDB(uuid);
                 console.log({ sess: sess });
                 // encrypt and return to client the password to use for the session, and the nonce to start with
@@ -153,7 +156,7 @@ class Session {
     }
     // base64 sha1 hash of the session's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
     genHash() {
-        var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status, captcha: this.captcha, nonce: this.nonce, password: this.password });
+        var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status, captcha: this.captcha, nonce: this.nonce, password: this.password, seq: this.seq });
         var hsh = crypto.createHash('sha1').update(j).digest('base64');
         return hsh;
     }
@@ -163,7 +166,7 @@ class Session {
     }
     // cast session as a JSON object
     toJSON() {
-        return { id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), captcha: this.captcha.toString(), nonce: this.nonce.toString(), password: this.password, chkSum: this.chkSum };
+        return { id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), captcha: this.captcha.toString(), nonce: this.nonce.toString(), password: this.password, seq: this.seq.toString(), chkSum: this.chkSum };
     }
     // casted value checks for allowed values in a session
     verifyValuesAreValid() {
@@ -231,6 +234,13 @@ class Session {
             }
             errDesc = errDesc + 'Invalid value for password.';
         }
+        var seqIsValid = (this.seq >= 0);
+        if (!seqIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for seq.';
+        }
         var chkSumIsValid = (true);
         if (!chkSumIsValid) {
             if (errDesc.length > 0) {
@@ -238,14 +248,14 @@ class Session {
             }
             errDesc = errDesc + 'Invalid value for chkSum.';
         }
-        return [idIsValid && sessionIdIsValid && createdIsValid && lastSeenIsValid && ipIsValid && statusIsValid && captchaIsValid && nonceIsValid && passwordIsValid && chkSumIsValid, errDesc];
+        return [idIsValid && sessionIdIsValid && createdIsValid && lastSeenIsValid && ipIsValid && statusIsValid && captchaIsValid && nonceIsValid && passwordIsValid && seqIsValid && chkSumIsValid, errDesc];
     }
     // instantiate a session from string values. Null returned if sting values fail regex checks or casted value checks
-    static fromStrings(id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, chkSum) {
-        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(sessionId), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(created), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(lastSeen), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(ip), new RegExp("^[0-9]+$", "g").test(status), new RegExp("^[0-9]+$", "g").test(captcha), new RegExp("^[0-9]+$", "g").test(nonce), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(password), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+    static fromStrings(id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum) {
+        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(sessionId), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(created), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(lastSeen), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(ip), new RegExp("^[0-9]+$", "g").test(status), new RegExp("^[0-9]+$", "g").test(captcha), new RegExp("^[0-9]+$", "g").test(nonce), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(password), new RegExp("^[0-9]+$", "g").test(seq), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
         if (!regexTests.every(Boolean)) {
             // detail invalid value
-            let paramNames = ["id", "sessionId", "created", "lastSeen", "ip", "status", "captcha", "nonce", "password", "chkSum"];
+            let paramNames = ["id", "sessionId", "created", "lastSeen", "ip", "status", "captcha", "nonce", "password", "seq", "chkSum"];
             for (var i = 0; i < regexTests.length; i++) {
                 if (!regexTests[i]) {
                     console.log('posted value for ' + paramNames[i] + ' fails regex check');
@@ -253,7 +263,7 @@ class Session {
             }
             return null;
         }
-        let session = new Session(parseInt(id), (sessionId), new Date(created), new Date(lastSeen), (ip), parseInt(status), parseInt(captcha), parseInt(nonce), (password), (chkSum));
+        let session = new Session(parseInt(id), (sessionId), new Date(created), new Date(lastSeen), (ip), parseInt(status), parseInt(captcha), parseInt(nonce), (password), parseInt(seq), (chkSum));
         let valueCheck = session.verifyValuesAreValid();
         let success = valueCheck[0];
         if (success) {
@@ -290,11 +300,11 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
+            const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not found.');
             }
-            let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].chksum);
+            let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
             //TODO: update last seen
             return retval.setData(s);
         });
@@ -312,12 +322,12 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            const res = yield client.query('SELECT id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, chkSum FROM sessions;');
+            const res = yield client.query('SELECT id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions;');
             if (res.rowCount == 0) {
                 return retval.setData(retvalData);
             } // handle empty table
             for (let i = 0; i < res.rowCount; i++) {
-                retvalData.push(new Session(res.rows[i].id, res.rows[i].sessionid, res.rows[i].created, res.rows[i].lastseen, res.rows[i].ip, res.rows[i].status, res.rows[i].captcha, res.rows[i].nonce, res.rows[i].password, res.rows[i].chksum));
+                retvalData.push(new Session(res.rows[i].id, res.rows[i].sessionid, res.rows[i].created, res.rows[i].lastseen, res.rows[i].ip, res.rows[i].status, res.rows[i].captcha, res.rows[i].nonce, res.rows[i].password, res.rows[i].seq, res.rows[i].chksum));
             }
             return retval.setData(retvalData);
         });
@@ -335,7 +345,7 @@ class Session {
             }
             let client = fetchConn.data;
             this.chkSum = this.genHash();
-            const res = yield client.query('CALL addSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);', [this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, this.chkSum, 0]);
+            const res = yield client.query('CALL addSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);', [this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, this.seq, this.chkSum, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not added.');
             }
@@ -356,7 +366,7 @@ class Session {
             }
             let client = fetchConn.data;
             let newChksum = this.genHash();
-            const res = yield client.query('CALL updateSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12);', [this.id, this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, newChksum, this.chkSum, 0]);
+            const res = yield client.query('CALL updateSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);', [this.id, this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, this.seq, newChksum, this.chkSum, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not updated. 0 row count.');
             }
