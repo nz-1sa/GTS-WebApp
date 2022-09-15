@@ -122,9 +122,11 @@ class Session {
                     console.log('failed NaN check');
                     return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`, '', []);
                 }
-                let timeTolerance = new Date().getTime() - 1000;
-                if (parseInt(decoded) < timeTolerance) {
-                    console.log({ toold: timeTolerance });
+                let now = new Date().getTime();
+                let timeDiff = now - parseInt(decoded);
+                console.log({ now: now, timeDiff: timeDiff });
+                if (timeDiff < 0 || timeDiff > 1000) {
+                    console.log('failed Date check');
                     return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
                 }
                 // generate password and nonce for the session
