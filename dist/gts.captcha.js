@@ -130,7 +130,7 @@ class Session {
                 // generate password and nonce for the session
                 console.log('setting session credentials');
                 sess.password = yield Session.genSessionPassword();
-                sess.nonce = 1 + Math.random() * 483600;
+                sess.nonce = Math.floor(1 + Math.random() * 483600);
                 sess.updateDB(uuid);
                 console.log({ sess: sess });
                 // encrypt and return to client the password to use for the session, and the nonce to start with

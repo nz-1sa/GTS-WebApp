@@ -116,7 +116,7 @@ export class Session{
 			// generate password and nonce for the session
 			console.log('setting session credentials');
 			sess.password = await Session.genSessionPassword();
-			sess.nonce = 1+Math.random()*483600;
+			sess.nonce = Math.floor(1+Math.random()*483600);
 			sess.updateDB(uuid);
 			console.log({sess:sess});
 			
