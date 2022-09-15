@@ -110,7 +110,7 @@ export class Session{
 			let now:number = new Date().getTime();
 			let timeDiff= now-parseInt(decoded);
 			console.log({now:now, timeDiff:timeDiff});
-			if(timeDiff < 0 || timeDiff > 1000 ){
+			if(timeDiff < 0 || timeDiff > 20000 ){	// request must arrive within 20 seconds
 				console.log('failed Date check');
 				return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
 			}
