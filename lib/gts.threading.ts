@@ -182,6 +182,108 @@ export async function singleLock<T>(purpose:string, uuid:string, action:Function
 	return jobValueFirst;
 }
 
+let sequencedStartJobsWaiting:GTS.DM.HashTable<GTS.DM.HashTable<SequencedStartWaitingJob>> = {};
+export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequence:number, expectedSequence:number, action:Function, doLog?:boolean):Promise<T>{
+	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
+	if(!sequencedStartJobsWaiting[purpose]){sequencedStartJobsWaiting[purpose]={};}	// ensure storage defined for purpose
+	// just do the request if it is in the correct order
+	if(reqSequence==expectedSequence){
+		let res:GTS.DM.WrappedResult<boolean> = await DB.actionSequence(uuid, purpose, reqSequence);
+		if(res.error){
+			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'DB error checking sequence #'+reqSequence),uuid);}
+			return Promise.reject('DB error');
+		}
+		let doubleCheck:boolean = res.data!;
+		if(doubleCheck){
+			let cur:string = reqSequence.toString();
+			if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
+				// remove store if pre request was qued
+				delete sequencedStartJobsWaiting[purpose][cur];
+				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'deleted prequed job for #'+reqSequence+' as a new request arrived at the expected sequence'),uuid);}
+			}
+			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for expected sequence #'+reqSequence),uuid);}
+			let jobValue:T = await action(uuid);
+			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job #'+reqSequence+' done'),uuid);}
+			let next:string = (reqSequence+1).toString();
+			if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
+				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'found a qued job #'+next+'after doing job at expected sequence #'+reqSequence),uuid);}
+				// async start qued job
+				let doNext = async function(){
+					let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[purpose][next];
+					nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.action,nextJob.resolve);
+				};
+				doNext();
+			}
+			return jobValue;
+		}
+		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'expected seqeunce job failed doubleCheck #'+reqSequence+' done'),uuid);}
+		return Promise.reject('incorrect sequence');
+	}
+	
+	if(reqSequence < expectedSequence){
+		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for already started, expected '+expectedSequence+' and got sequence #'+reqSequence),uuid);}
+		return Promise.reject('incorrect sequence');
+	} else if(reqSequence < (expectedSequence+11)){
+		let key = reqSequence.toString();
+		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'will que future job #'+reqSequence+' as are almost there from '+expectedSequence),uuid);}
+			
+		// return a promise that the job will be done on its turn
+		return new Promise(async function(resolve, reject){
+			// que this job to be done when possible
+			sequencedStartJobsWaiting[purpose][key]={uuid:uuid, reqSequence:reqSequence, action:action, resolve:resolve, process:async function(uuid:string, reqSequence:number, action:Function,resolve:Function){
+				let res:GTS.DM.WrappedResult<boolean> = await DB.actionSequence(uuid, purpose, reqSequence);
+				if(res.error){
+					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'DB error checking sequence #'+reqSequence),uuid);}
+					return Promise.reject('DB error');
+				}
+				let doubleCheck:boolean = res.data!;
+				if(doubleCheck){
+					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'qued job being processed #'+reqSequence),uuid);}
+					let jobValue:T = await action(uuid);
+					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'qued job done #'+reqSequence),uuid);}
+					let next:string = (reqSequence+1).toString();
+					if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
+						if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'continuing to another qued job, #'+next+' afer doing #'+reqSequence),uuid);}
+						// async start qued job
+						let doNext = async function(){
+							let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[purpose][next];
+							nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.action,nextJob.resolve);
+						};
+						doNext();
+					}
+					
+					// let the thread continue that was waiting for the job to be done
+					resolve(jobValue);
+					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job/thread released #'+reqSequence),uuid);}
+				} else {
+					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'continued que job failed doubleCheck #'+reqSequence),uuid);}
+					reject('invalid sequence');
+				}
+			}};
+			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job qued #'+reqSequence),uuid);}
+		});
+	} else {
+		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for too far in the future, wanted '+expectedSequence+' and got sequence #'+reqSequence),uuid);}
+		return Promise.reject('incorrect sequence');
+	}
+}
+
+class SequencedStartWaitingJob{
+	uuid: string;
+	reqSequence: number;
+	action: Function;
+	resolve: Function;
+	process: Function;
+	
+	constructor( pUuid:string, pReqSequence:number, pAction:Function, pResolve:Function, pProcess:Function ){
+		this.uuid = pUuid;
+		this.reqSequence = pReqSequence;
+		this.action = pAction;
+		this.resolve = pResolve;
+		this.process = pProcess;
+	}
+}
+
 let throttleStatus:GTS.DM.HashTable<boolean> = {};
 let throttleWaiting:GTS.DM.HashTable<SingleLockWaitingJob[]> = {};
 let throttleLastDone:GTS.DM.HashTable<number> = {};
@@ -482,5 +584,17 @@ export namespace DB{
 		}catch( err:any ){
 			return new GTS.DM.WrappedResult<void>().setError(err.toString());
 		}
+	}
+	
+	export async function actionSequence(uuid:string, purpose:string, reqSequence:number):Promise<GTS.DM.WrappedResult<boolean>>{	// purpose is sessionId
+		let retval:GTS.DM.WrappedResult<boolean>= new GTS.DM.WrappedResult()
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection('actionSequence', uuid);
+		if(fetchConn.error || fetchConn.data == null){
+			return retval.setError('DB Connection error\r\n'+fetchConn.message);
+		}
+		let client:DBCore.Client = fetchConn.data!;
+		const res = await client.query('CALL actionSequence($1,$2,$3);',[purpose, reqSequence, 0]);
+		if(res.rows[0].expectedSequence == reqSequence){ return retval.setData( true ); }
+		return retval.setData( false );
 	}
 }

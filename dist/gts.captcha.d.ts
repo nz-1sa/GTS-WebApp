@@ -21,6 +21,8 @@ export declare class Session {
     chkSum: string;
     constructor(pId: number, pSessionId: string, pCreated: Date, pLastSeen: Date, pIp: string, pStatus: SessionStatus, pCaptcha: number, pNonce: number, pPassword: string, pSeq: number, pChkSum: string);
     static attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
+    private static handleStartSessionRequest;
+    private static handleLoginRequest;
     genHash(): string;
     toString(): string;
     toJSON(): object;

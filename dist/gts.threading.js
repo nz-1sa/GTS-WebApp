@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.delayCancellable = exports.CancellableDelay = exports.pause = void 0;
+exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.sequencedStartLock = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.delayCancellable = exports.CancellableDelay = exports.pause = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
@@ -276,6 +276,147 @@ function singleLock(purpose, uuid, action, doLog) {
     });
 }
 exports.singleLock = singleLock;
+let sequencedStartJobsWaiting = {};
+function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action, doLog) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (doLog === undefined) {
+            doLog = doLogging;
+        } // if no param is given to do logging, use the default
+        if (!sequencedStartJobsWaiting[purpose]) {
+            sequencedStartJobsWaiting[purpose] = {};
+        } // ensure storage defined for purpose
+        // just do the request if it is in the correct order
+        if (reqSequence == expectedSequence) {
+            let res = yield DB.actionSequence(uuid, purpose, reqSequence);
+            if (res.error) {
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
+                }
+                return Promise.reject('DB error');
+            }
+            let doubleCheck = res.data;
+            if (doubleCheck) {
+                let cur = reqSequence.toString();
+                if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
+                    // remove store if pre request was qued
+                    delete sequencedStartJobsWaiting[purpose][cur];
+                    if (doLog) {
+                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'deleted prequed job for #' + reqSequence + ' as a new request arrived at the expected sequence'), uuid);
+                    }
+                }
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job arrived for expected sequence #' + reqSequence), uuid);
+                }
+                let jobValue = yield action(uuid);
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job #' + reqSequence + ' done'), uuid);
+                }
+                let next = (reqSequence + 1).toString();
+                if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
+                    if (doLog) {
+                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'found a qued job #' + next + 'after doing job at expected sequence #' + reqSequence), uuid);
+                    }
+                    // async start qued job
+                    let doNext = function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            let nextJob = sequencedStartJobsWaiting[purpose][next];
+                            nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.action, nextJob.resolve);
+                        });
+                    };
+                    doNext();
+                }
+                return jobValue;
+            }
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'expected seqeunce job failed doubleCheck #' + reqSequence + ' done'), uuid);
+            }
+            return Promise.reject('incorrect sequence');
+        }
+        if (reqSequence < expectedSequence) {
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job arrived for already started, expected ' + expectedSequence + ' and got sequence #' + reqSequence), uuid);
+            }
+            return Promise.reject('incorrect sequence');
+        }
+        else if (reqSequence < (expectedSequence + 11)) {
+            let key = reqSequence.toString();
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'will que future job #' + reqSequence + ' as are almost there from ' + expectedSequence), uuid);
+            }
+            // return a promise that the job will be done on its turn
+            return new Promise(function (resolve, reject) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    // que this job to be done when possible
+                    sequencedStartJobsWaiting[purpose][key] = { uuid: uuid, reqSequence: reqSequence, action: action, resolve: resolve, process: function (uuid, reqSequence, action, resolve) {
+                            return __awaiter(this, void 0, void 0, function* () {
+                                let res = yield DB.actionSequence(uuid, purpose, reqSequence);
+                                if (res.error) {
+                                    if (doLog) {
+                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
+                                    }
+                                    return Promise.reject('DB error');
+                                }
+                                let doubleCheck = res.data;
+                                if (doubleCheck) {
+                                    if (doLog) {
+                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'qued job being processed #' + reqSequence), uuid);
+                                    }
+                                    let jobValue = yield action(uuid);
+                                    if (doLog) {
+                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'qued job done #' + reqSequence), uuid);
+                                    }
+                                    let next = (reqSequence + 1).toString();
+                                    if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
+                                        if (doLog) {
+                                            yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'continuing to another qued job, #' + next + ' afer doing #' + reqSequence), uuid);
+                                        }
+                                        // async start qued job
+                                        let doNext = function () {
+                                            return __awaiter(this, void 0, void 0, function* () {
+                                                let nextJob = sequencedStartJobsWaiting[purpose][next];
+                                                nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.action, nextJob.resolve);
+                                            });
+                                        };
+                                        doNext();
+                                    }
+                                    // let the thread continue that was waiting for the job to be done
+                                    resolve(jobValue);
+                                    if (doLog) {
+                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job/thread released #' + reqSequence), uuid);
+                                    }
+                                }
+                                else {
+                                    if (doLog) {
+                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'continued que job failed doubleCheck #' + reqSequence), uuid);
+                                    }
+                                    reject('invalid sequence');
+                                }
+                            });
+                        } };
+                    if (doLog) {
+                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job qued #' + reqSequence), uuid);
+                    }
+                });
+            });
+        }
+        else {
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job arrived for too far in the future, wanted ' + expectedSequence + ' and got sequence #' + reqSequence), uuid);
+            }
+            return Promise.reject('incorrect sequence');
+        }
+    });
+}
+exports.sequencedStartLock = sequencedStartLock;
+class SequencedStartWaitingJob {
+    constructor(pUuid, pReqSequence, pAction, pResolve, pProcess) {
+        this.uuid = pUuid;
+        this.reqSequence = pReqSequence;
+        this.action = pAction;
+        this.resolve = pResolve;
+        this.process = pProcess;
+    }
+}
 let throttleStatus = {};
 let throttleWaiting = {};
 let throttleLastDone = {};
@@ -649,4 +790,20 @@ var DB;
         });
     }
     DB.pruneThreadinglogs = pruneThreadinglogs;
+    function actionSequence(uuid, purpose, reqSequence) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('actionSequence', uuid);
+            if (fetchConn.error || fetchConn.data == null) {
+                return retval.setError('DB Connection error\r\n' + fetchConn.message);
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('CALL actionSequence($1,$2,$3);', [purpose, reqSequence, 0]);
+            if (res.rows[0].expectedSequence == reqSequence) {
+                return retval.setData(true);
+            }
+            return retval.setData(false);
+        });
+    }
+    DB.actionSequence = actionSequence;
 })(DB = exports.DB || (exports.DB = {}));
