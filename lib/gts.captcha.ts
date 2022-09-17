@@ -4,6 +4,7 @@ import * as UUID from "./gts.uuid";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
 import *  as WebApp from './gts.webapp';
+import * as Threading from "./gts.threading";
 const PATH = require( 'path' );
 const WEB:WebApp.WS.WebServerHelper = new WebApp.WS.WebServerHelper( PATH.join( __dirname, '..' ) );
 var crypto = require('crypto');
@@ -64,9 +65,38 @@ export class Session{
 		
 		//NOTE: requests to the server must be received in the order of nonce
 		//TODO: will need to make a handler to hold and sort them as they arrive to process
-		web.registerHandlerUnchecked(webapp, '/api/talk', ['message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, message:string){
-			return new WS.WebResponse(false, "NOT YET IMPLEMENTED", `UUID:${uuid} talk called, but method not yet implemented`, '');
+		web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+			return await Session.handleSecureTalk(uuid, requestIp, cookies, sequence, message);
 		});
+		
+	}
+	
+	private static async handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+		if(!hs){
+			return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`,'', []);
+		}
+		if(!s){
+			return new WS.WebResponse(false, "ERROR: Failed to connect to session.", `UUID:${uuid} Error getting session from DB`,'', []);
+		}
+		if(s!.status != SessionStatus.LoggedIn){
+			return new WS.WebResponse(false, "ERROR: Need to login first.", `UUID:${uuid} Attempted session talk before login`,'', []);
+		};
+		if(!new RegExp("^[0-9]+$", "g").test(sequence)){
+			return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence fails regex check`,'', []);
+		}
+		
+		// by getting to here there is a logged in session
+		let doLogSequenceCheck = true;
+		Threading.sequencedStartLock<string>(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
+			console.log('talking at number #'+sequence);
+			console.log({pass:s.password, nonce:s.nonce+sequence});
+			
+			// decrypt challenge using knownSaltPassHash and captcha
+			let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+sequence));
+			
+			console.log({decoded:decoded});
+		}, doLogSequenceCheck)
 		
 	}
 	
@@ -234,6 +264,17 @@ export class Session{
 		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
 		//TODO: update last seen
 		return retval.setData( s );
+	}
+	
+	static async checkAndIncrementSequenceInDB(uuid:string, purpose:string, reqSequence:number): Promise<GTS.DM.WrappedResult<boolean>>{
+		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
+		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }
+		if(fetchConn.data == null){ return retval.setError('DB Connection NULL error'); }
+		let client:DBCore.Client = fetchConn.data;
+		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[purpose,reqSequence,0]);
+		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
+		return retval.setData(res.rows[0].doseq == reqSequence);
 	}
 	
 	// list all the sessions from the database in full detail

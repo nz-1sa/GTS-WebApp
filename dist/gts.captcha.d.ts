@@ -21,6 +21,7 @@ export declare class Session {
     chkSum: string;
     constructor(pId: number, pSessionId: string, pCreated: Date, pLastSeen: Date, pIp: string, pStatus: SessionStatus, pCaptcha: number, pNonce: number, pPassword: string, pSeq: number, pChkSum: string);
     static attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
+    private static handleSecureTalk;
     private static handleStartSessionRequest;
     private static handleLoginRequest;
     genHash(): string;
@@ -30,6 +31,7 @@ export declare class Session {
     static fromStrings(id: string, sessionId: string, created: string, lastSeen: string, ip: string, status: string, captcha: string, nonce: string, password: string, seq: string, chkSum: string): Session | null;
     static isProposedSessionIdUnique(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<boolean>>;
     static getSessionFromDB(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<Session>>;
+    static checkAndIncrementSequenceInDB(uuid: string, purpose: string, reqSequence: number): Promise<GTS.DM.WrappedResult<boolean>>;
     static fetchAllFromDB(uuid: string): Promise<GTS.DM.WrappedResult<Session[]>>;
     addToDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;
     updateDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;

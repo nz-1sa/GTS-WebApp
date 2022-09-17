@@ -277,7 +277,7 @@ function singleLock(purpose, uuid, action, doLog) {
 }
 exports.singleLock = singleLock;
 let sequencedStartJobsWaiting = {};
-function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqCheck, action, doLog) {
+function sequencedStartLock(uuid, purpose, reqSequence, expectedSequence, seqCheck, action, doLog) {
     return __awaiter(this, void 0, void 0, function* () {
         if (doLog === undefined) {
             doLog = doLogging;
@@ -287,50 +287,23 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqChe
         } // ensure storage defined for purpose
         // just do the request if it is in the correct order
         if (reqSequence == expectedSequence) {
-            let res = yield seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
-            if (res.error) {
-                if (doLog) {
-                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
-                }
-                return Promise.reject('DB error');
-            }
-            let doubleCheck = res.data;
-            if (doubleCheck) {
-                let cur = reqSequence.toString();
-                if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
-                    // remove store if pre request was qued
-                    delete sequencedStartJobsWaiting[purpose][cur];
-                    if (doLog) {
-                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'deleted prequed job for #' + reqSequence + ' as a new request arrived at the expected sequence'), uuid);
-                    }
-                }
-                if (doLog) {
-                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job arrived for expected sequence #' + reqSequence), uuid);
-                }
-                let jobValue = yield action(uuid);
-                if (doLog) {
-                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job #' + reqSequence + ' done'), uuid);
-                }
-                let next = (reqSequence + 1).toString();
-                if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
-                    if (doLog) {
-                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'found a qued job #' + next + 'after doing job at expected sequence #' + reqSequence), uuid);
-                    }
-                    // async start qued job
-                    let doNext = function () {
-                        return __awaiter(this, void 0, void 0, function* () {
-                            let nextJob = sequencedStartJobsWaiting[purpose][next];
-                            nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.seqCheck, nextJob.action, nextJob.resolve);
-                        });
-                    };
-                    doNext();
-                }
-                return jobValue;
-            }
             if (doLog) {
-                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'expected seqeunce job failed doubleCheck #' + reqSequence + ' done'), uuid);
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job arrived for expected sequence #' + reqSequence), uuid);
             }
-            return Promise.reject('incorrect sequence');
+            // remove store if previous request was qued for the sequence we are processing now
+            let cur = reqSequence.toString();
+            if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
+                delete sequencedStartJobsWaiting[purpose][cur];
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'deleted prequed job for #' + reqSequence + ' as a new request arrived at the expected sequence'), uuid);
+                }
+            }
+            return new Promise(function (resolve, reject) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    let curJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
+                    curJob.process(doLog);
+                });
+            });
         }
         if (reqSequence < expectedSequence) {
             if (doLog) {
@@ -338,7 +311,7 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqChe
             }
             return Promise.reject('incorrect sequence');
         }
-        else if (reqSequence < (expectedSequence + 11)) {
+        if (reqSequence < (expectedSequence + 11)) {
             let key = reqSequence.toString();
             if (doLog) {
                 yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'will que future job #' + reqSequence + ' as are almost there from ' + expectedSequence), uuid);
@@ -346,53 +319,8 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqChe
             // return a promise that the job will be done on its turn
             return new Promise(function (resolve, reject) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    // que this job to be done when possible
-                    sequencedStartJobsWaiting[purpose][key] = { uuid: uuid, reqSequence: reqSequence, seqCheck: seqCheck, action: action, resolve: resolve, process: function (uuid, reqSequence, seqCheck, action, resolve) {
-                            return __awaiter(this, void 0, void 0, function* () {
-                                let res = yield seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
-                                if (res.error) {
-                                    if (doLog) {
-                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
-                                    }
-                                    return Promise.reject('DB error');
-                                }
-                                let doubleCheck = res.data;
-                                if (doubleCheck) {
-                                    if (doLog) {
-                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'qued job being processed #' + reqSequence), uuid);
-                                    }
-                                    let jobValue = yield action(uuid);
-                                    if (doLog) {
-                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'qued job done #' + reqSequence), uuid);
-                                    }
-                                    let next = (reqSequence + 1).toString();
-                                    if (sequencedStartJobsWaiting[purpose].hasOwnProperty(next)) {
-                                        if (doLog) {
-                                            yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'continuing to another qued job, #' + next + ' afer doing #' + reqSequence), uuid);
-                                        }
-                                        // async start qued job
-                                        let doNext = function () {
-                                            return __awaiter(this, void 0, void 0, function* () {
-                                                let nextJob = sequencedStartJobsWaiting[purpose][next];
-                                                nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.seqCheck, nextJob.action, nextJob.resolve);
-                                            });
-                                        };
-                                        doNext();
-                                    }
-                                    // let the thread continue that was waiting for the job to be done
-                                    resolve(jobValue);
-                                    if (doLog) {
-                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job/thread released #' + reqSequence), uuid);
-                                    }
-                                }
-                                else {
-                                    if (doLog) {
-                                        yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'continued que job failed doubleCheck #' + reqSequence), uuid);
-                                    }
-                                    reject('invalid sequence');
-                                }
-                            });
-                        } };
+                    let quedJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
+                    sequencedStartJobsWaiting[purpose][key] = quedJob;
                     if (doLog) {
                         yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'job qued #' + reqSequence), uuid);
                     }
@@ -409,13 +337,60 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqChe
 }
 exports.sequencedStartLock = sequencedStartLock;
 class SequencedStartWaitingJob {
-    constructor(pUuid, pReqSequence, pSeqCheck, pAction, pResolve, pProcess) {
+    constructor(pUuid, pPurpose, pReqSequence, pSeqCheck, pAction, pResolve, pReject) {
         this.uuid = pUuid;
+        this.purpose = pPurpose;
         this.reqSequence = pReqSequence;
         this.seqCheck = pSeqCheck;
         this.action = pAction;
         this.resolve = pResolve;
-        this.process = pProcess;
+        this.reject = pReject;
+    }
+    process(doLog) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let res = yield this.seqCheck(this.uuid, this.purpose, this.reqSequence); // DB.actionSequence
+            if (res.error) {
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'DB error checking sequence #' + this.reqSequence), this.uuid);
+                }
+                this.reject('Sequene Check Error'); //TODO: Is this correct logic? Cancel the  job, how can we process them when there is an error checking sequence
+            }
+            let doubleCheck = res.data;
+            if (!doubleCheck) {
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'Sequene check failed for #' + this.reqSequence), this.uuid);
+                }
+                this.reject('Sequene Check Failed'); //TODO: Is this correct logic? Cancel the job if is the wrong sequence
+            }
+            // Log and do the job
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'started job #' + this.reqSequence), this.uuid);
+            }
+            let jobValue = yield this.action(this.uuid, this.purpose, this.reqSequence);
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'finished job #' + this.reqSequence), this.uuid);
+            }
+            // Check if there is a next job waiting
+            let next = (this.reqSequence + 1).toString();
+            if (sequencedStartJobsWaiting[this.purpose].hasOwnProperty(next)) {
+                if (doLog) {
+                    yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'continuing to next job, #' + next + ' afer doing #' + this.reqSequence), this.uuid);
+                }
+                // async start qued job
+                let doNext = function (pPurpose, pNext) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        let nextJob = sequencedStartJobsWaiting[pPurpose][pNext];
+                        nextJob.process(doLog);
+                    });
+                };
+                doNext(this.purpose, next);
+            }
+            // let the thread continue that was waiting for the job to be done
+            this.resolve(jobValue);
+            if (doLog) {
+                yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'job/thread released #' + this.reqSequence), this.uuid);
+            }
+        });
     }
 }
 let throttleStatus = {};
