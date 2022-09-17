@@ -277,7 +277,7 @@ function singleLock(purpose, uuid, action, doLog) {
 }
 exports.singleLock = singleLock;
 let sequencedStartJobsWaiting = {};
-function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action, doLog) {
+function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, seqCheck, action, doLog) {
     return __awaiter(this, void 0, void 0, function* () {
         if (doLog === undefined) {
             doLog = doLogging;
@@ -287,7 +287,7 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action
         } // ensure storage defined for purpose
         // just do the request if it is in the correct order
         if (reqSequence == expectedSequence) {
-            let res = yield DB.actionSequence(uuid, purpose, reqSequence);
+            let res = yield seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
             if (res.error) {
                 if (doLog) {
                     yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
@@ -320,7 +320,7 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action
                     let doNext = function () {
                         return __awaiter(this, void 0, void 0, function* () {
                             let nextJob = sequencedStartJobsWaiting[purpose][next];
-                            nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.action, nextJob.resolve);
+                            nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.seqCheck, nextJob.action, nextJob.resolve);
                         });
                     };
                     doNext();
@@ -347,9 +347,9 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action
             return new Promise(function (resolve, reject) {
                 return __awaiter(this, void 0, void 0, function* () {
                     // que this job to be done when possible
-                    sequencedStartJobsWaiting[purpose][key] = { uuid: uuid, reqSequence: reqSequence, action: action, resolve: resolve, process: function (uuid, reqSequence, action, resolve) {
+                    sequencedStartJobsWaiting[purpose][key] = { uuid: uuid, reqSequence: reqSequence, seqCheck: seqCheck, action: action, resolve: resolve, process: function (uuid, reqSequence, seqCheck, action, resolve) {
                             return __awaiter(this, void 0, void 0, function* () {
-                                let res = yield DB.actionSequence(uuid, purpose, reqSequence);
+                                let res = yield seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
                                 if (res.error) {
                                     if (doLog) {
                                         yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, uuid, 'SequencedStartLock', purpose, 'DB error checking sequence #' + reqSequence), uuid);
@@ -374,7 +374,7 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action
                                         let doNext = function () {
                                             return __awaiter(this, void 0, void 0, function* () {
                                                 let nextJob = sequencedStartJobsWaiting[purpose][next];
-                                                nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.action, nextJob.resolve);
+                                                nextJob.process(nextJob.uuid, nextJob.reqSequence, nextJob.seqCheck, nextJob.action, nextJob.resolve);
                                             });
                                         };
                                         doNext();
@@ -409,9 +409,10 @@ function sequencedStartLock(purpose, uuid, reqSequence, expectedSequence, action
 }
 exports.sequencedStartLock = sequencedStartLock;
 class SequencedStartWaitingJob {
-    constructor(pUuid, pReqSequence, pAction, pResolve, pProcess) {
+    constructor(pUuid, pReqSequence, pSeqCheck, pAction, pResolve, pProcess) {
         this.uuid = pUuid;
         this.reqSequence = pReqSequence;
+        this.seqCheck = pSeqCheck;
         this.action = pAction;
         this.resolve = pResolve;
         this.process = pProcess;

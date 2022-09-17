@@ -183,12 +183,12 @@ export async function singleLock<T>(purpose:string, uuid:string, action:Function
 }
 
 let sequencedStartJobsWaiting:GTS.DM.HashTable<GTS.DM.HashTable<SequencedStartWaitingJob>> = {};
-export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequence:number, expectedSequence:number, action:Function, doLog?:boolean):Promise<T>{
+export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequence:number, expectedSequence:number, seqCheck:Function, action:Function, doLog?:boolean):Promise<T>{
 	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
 	if(!sequencedStartJobsWaiting[purpose]){sequencedStartJobsWaiting[purpose]={};}	// ensure storage defined for purpose
 	// just do the request if it is in the correct order
 	if(reqSequence==expectedSequence){
-		let res:GTS.DM.WrappedResult<boolean> = await DB.actionSequence(uuid, purpose, reqSequence);
+		let res:GTS.DM.WrappedResult<boolean> = await seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
 		if(res.error){
 			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'DB error checking sequence #'+reqSequence),uuid);}
 			return Promise.reject('DB error');
@@ -210,7 +210,7 @@ export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequ
 				// async start qued job
 				let doNext = async function(){
 					let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[purpose][next];
-					nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.action,nextJob.resolve);
+					nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.seqCheck,nextJob.action,nextJob.resolve);
 				};
 				doNext();
 			}
@@ -230,8 +230,8 @@ export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequ
 		// return a promise that the job will be done on its turn
 		return new Promise(async function(resolve, reject){
 			// que this job to be done when possible
-			sequencedStartJobsWaiting[purpose][key]={uuid:uuid, reqSequence:reqSequence, action:action, resolve:resolve, process:async function(uuid:string, reqSequence:number, action:Function,resolve:Function){
-				let res:GTS.DM.WrappedResult<boolean> = await DB.actionSequence(uuid, purpose, reqSequence);
+			sequencedStartJobsWaiting[purpose][key]={uuid:uuid, reqSequence:reqSequence, seqCheck:seqCheck, action:action, resolve:resolve, process:async function(uuid:string, reqSequence:number, seqCheck:Function, action:Function,resolve:Function){
+				let res:GTS.DM.WrappedResult<boolean> = await seqCheck(uuid, purpose, reqSequence); // DB.actionSequence
 				if(res.error){
 					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'DB error checking sequence #'+reqSequence),uuid);}
 					return Promise.reject('DB error');
@@ -247,7 +247,7 @@ export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequ
 						// async start qued job
 						let doNext = async function(){
 							let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[purpose][next];
-							nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.action,nextJob.resolve);
+							nextJob.process(nextJob.uuid,nextJob.reqSequence,nextJob.seqCheck,nextJob.action,nextJob.resolve);
 						};
 						doNext();
 					}
@@ -271,13 +271,15 @@ export async function sequencedStartLock<T>(purpose:string, uuid:string, reqSequ
 class SequencedStartWaitingJob{
 	uuid: string;
 	reqSequence: number;
+	seqCheck: Function;
 	action: Function;
 	resolve: Function;
 	process: Function;
 	
-	constructor( pUuid:string, pReqSequence:number, pAction:Function, pResolve:Function, pProcess:Function ){
+	constructor( pUuid:string, pReqSequence:number, pSeqCheck:Function, pAction:Function, pResolve:Function, pProcess:Function ){
 		this.uuid = pUuid;
 		this.reqSequence = pReqSequence;
+		this.seqCheck = pSeqCheck;
 		this.action = pAction;
 		this.resolve = pResolve;
 		this.process = pProcess;
