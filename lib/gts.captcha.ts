@@ -170,7 +170,7 @@ export class Session{
 		
 		// generate password and nonce for the session
 		console.log('setting session credentials');
-		//sess.statis = SessionStatus.LoggedIn;
+		sess.status = SessionStatus.LoggedIn;
 		sess.password = await Session.genSessionPassword();
 		sess.nonce = Math.floor(1+Math.random()*483600);
 		sess.seq = 1;
