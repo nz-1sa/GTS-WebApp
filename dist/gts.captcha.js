@@ -93,6 +93,8 @@ class Session {
     }
     static handleSecureTalk(uuid, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log('handleSecureTalk');
+            console.log({ uuid: uuid, requestIp: requestIp, cookies: cookies, sequence: sequence });
             const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
             if (!hs) {
                 return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`, '', []);

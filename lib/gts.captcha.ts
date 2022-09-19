@@ -72,6 +72,8 @@ export class Session{
 	}
 	
 	private static async handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+		console.log('handleSecureTalk');
+		console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
 		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
 		if(!hs){
 			return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`,'', []);
