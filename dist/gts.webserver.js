@@ -230,8 +230,11 @@ class WebServerHelper {
                 }
                 // get the response for the request
                 response = yield work(uuid, req.ip, req.cookies, ...paramVals);
-                console.log('response for handleRequestUnchecked is');
-                console.log(response);
+                if (!response) {
+                    response = new WebResponse(false, 'ERROR: No response returned for request.', `Error, no response returned for handling ${requestUrl}`, '');
+                    res.send(response.toString());
+                    return;
+                }
                 // set any cookies specified for the response
                 if (response.cookies != undefined && response.cookies.length > 0) {
                     for (var i = 0; i < response.cookies.length; i++) {
