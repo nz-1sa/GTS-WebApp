@@ -231,7 +231,7 @@ class WebServerHelper {
                 // get the response for the request
                 response = yield work(uuid, req.ip, req.cookies, ...paramVals);
                 // set any cookies specified for the response
-                if (response.cookies && response.cookies.length > 0) {
+                if (response.cookies != undefined && response.cookies.length > 0) {
                     for (var i = 0; i < response.cookies.length; i++) {
                         let c = response.cookies[i];
                         res.cookie(c.name, c.value, c.getOptions());
