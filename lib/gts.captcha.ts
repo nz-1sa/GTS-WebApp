@@ -91,7 +91,7 @@ export class Session{
 		// by getting to here there is a logged in session
 		let doLogSequenceCheck = true;
 		let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-		Threading.sequencedStartLock<string>(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
+		await Threading.sequencedStartLock<string>(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
 			console.log('talking at number #'+sequence);
 			console.log({pass:s.password, nonce:s.nonce+sequence});
 			

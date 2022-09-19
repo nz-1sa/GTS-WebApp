@@ -112,7 +112,7 @@ class Session {
             // by getting to here there is a logged in session
             let doLogSequenceCheck = true;
             let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-            Threading.sequencedStartLock(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, sequence) {
+            yield Threading.sequencedStartLock(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, sequence) {
                 console.log('talking at number #' + sequence);
                 console.log({ pass: s.password, nonce: s.nonce + sequence });
                 // decrypt challenge using knownSaltPassHash and captcha
