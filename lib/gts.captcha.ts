@@ -71,7 +71,7 @@ export class Session{
 		
 	}
 	
-	private static async handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+	private static async handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
 		console.log('handleSecureTalk');
 		console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
 		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
@@ -90,6 +90,7 @@ export class Session{
 		
 		// by getting to here there is a logged in session
 		let doLogSequenceCheck = true;
+		let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
 		Threading.sequencedStartLock<string>(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
 			console.log('talking at number #'+sequence);
 			console.log({pass:s.password, nonce:s.nonce+sequence});
@@ -98,8 +99,8 @@ export class Session{
 			let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+sequence));
 			
 			console.log({decoded:decoded});
-		}, doLogSequenceCheck)
-		
+		}, doLogSequenceCheck).then(decoded => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, decoded, []);} ).catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
+		return retval;
 	}
 	
 	private static async handleStartSessionRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<WS.WebResponse>{
