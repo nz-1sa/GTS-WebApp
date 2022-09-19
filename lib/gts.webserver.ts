@@ -192,6 +192,8 @@ export class WebServerHelper{
 			}
 			// get the response for the request
 			response = await work(uuid, req.ip, req.cookies, ...paramVals);
+			console.log('response for handleRequestUnchecked is');
+			console.log(response);
 			// set any cookies specified for the response
 			if(response.cookies != undefined && response.cookies.length > 0){
 				for(var i:number=0; i<response.cookies.length; i++){
