@@ -193,7 +193,7 @@ export class WebServerHelper{
 			// get the response for the request
 			response = await work(uuid, req.ip, req.cookies, ...paramVals);
 			// set any cookies specified for the response
-			if(response.cookies.length > 0){
+			if(response.cookies && response.cookies.length > 0){
 				for(var i:number=0; i<response.cookies.length; i++){
 					let c: Cookie = response.cookies[i];
 					res.cookie(c.name, c.value, c.getOptions());
