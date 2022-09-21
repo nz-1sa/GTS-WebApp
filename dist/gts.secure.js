@@ -59,7 +59,12 @@ function attachWebInterface(web, webapp) {
             return yield handleLoginRequest(uuid, requestIp, cookies, email, challenge);
         });
     });
-    //TODO: support log out
+    // log out of account
+    web.registerHandlerUnchecked(webapp, '/api/logout', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield handleLogoutRequest(uuid, requestIp, cookies, challenge);
+        });
+    });
     //NOTE: requests to the server must be received in sequence. Message is encrypted
     web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -106,6 +111,9 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
             return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
         }
         let sess = s;
+        if (sess.ip != requestIp) {
+            return new WS.WebResponse(false, "ERROR: Can not change IP during session.", `UUID:${uuid} Login called from wrong IP.`, '', []);
+        }
         if (sess.status != SessionStatus.Initialised) {
             return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
         }
@@ -148,6 +156,51 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
         return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
     });
 }
+// process logout for a session
+function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // check that there is an open session to log out from
+        const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+        if (!hs || !s) {
+            return new WS.WebResponse(false, "ERROR: A session needs to be started before logging out.", `UUID:${uuid} Logout called before startSession`, '', []);
+        }
+        let sess = s;
+        if (sess.ip != requestIp) {
+            return new WS.WebResponse(false, "ERROR: Can only logout from logged in IP", `UUID:${uuid} Logout called from wrong IP.`, '', []);
+        }
+        if (sess.status != SessionStatus.LoggedIn) {
+            return new WS.WebResponse(false, "ERROR: Can only logout after loggin in", `UUID:${uuid} Logout called before login.`, '', []);
+        }
+        //TODO: get knownSaltPassHash for email address from database
+        let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
+        // decrypt challenge using knownSaltPassHash and captcha
+        let decoded = Encodec.decrypt(challenge, knownSaltPassHash, 0);
+        if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
+            console.log('failed regex check');
+            return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, decoded content failed regex check.`, '', []);
+        }
+        // verify decrypted challenge content
+        if (parseInt(decoded) == NaN) {
+            console.log('failed NaN check');
+            return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, invalid decoded content.`, '', []);
+        }
+        let now = new Date().getTime();
+        let timeDiff = now - parseInt(decoded);
+        console.log({ now: now, timeDiff: timeDiff });
+        if (timeDiff < 0 || timeDiff > 20000) { // request must arrive within 20 seconds
+            console.log('failed Date check');
+            return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, request to old.`, '', []);
+        }
+        sess.status = SessionStatus.LoggedOut;
+        sess.updateDB(uuid);
+        // encrypt and return to client the password to use for the session, and the nonce to start with
+        let plainTextResponse = JSON.stringify({ pass: sess.password, fluff: Math.floor(1 + Math.random() * 483600) });
+        console.log({ plainTextResponse: plainTextResponse });
+        let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, 0);
+        console.log({ encResponse: encResponse });
+        return new WS.WebResponse(true, "", `UUID:${uuid} Logout success`, `"${encResponse}"`);
+    });
+}
 // secure talk within a session
 function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -160,7 +213,11 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         if (!s) {
             return new WS.WebResponse(false, "ERROR: Failed to connect to session.", `UUID:${uuid} Error getting session from DB`, '', []);
         }
-        if (s.status != SessionStatus.LoggedIn) {
+        let sess = s;
+        if (sess.ip != requestIp) {
+            return new WS.WebResponse(false, "ERROR: Can not change IP during session.", `UUID:${uuid} Talk called from wrong IP.`, '', []);
+        }
+        if (sess.status != SessionStatus.LoggedIn) {
             return new WS.WebResponse(false, "ERROR: Need to login first.", `UUID:${uuid} Attempted session talk before login`, '', []);
         }
         ;
@@ -170,12 +227,12 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         // by getting to here there is a logged in session
         let doLogSequenceCheck = true;
         let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-        yield Threading.sequencedStartLock(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, seqNum) {
+        yield Threading.sequencedStartLock(uuid, sess.sessionId, parseInt(sequence), sess.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, seqNum) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);
-                console.log({ pass: s.password, nonce: s.nonce + seqNum });
+                console.log({ pass: sess.password, nonce: sess.nonce + seqNum });
                 // decrypt challenge using knownSaltPassHash and captcha
-                let decoded = Encodec.decrypt(message, s.password, (s.nonce + seqNum));
+                let decoded = Encodec.decrypt(message, sess.password, (sess.nonce + seqNum));
                 const [action, params] = JSON.parse(decoded);
                 console.log({ action: action, params: params });
                 if (!web.adminHandlers[action]) {
@@ -187,7 +244,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                 return adminResp;
             });
         }, doLogSequenceCheck)
-            .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), s.password, (s.nonce + parseInt(sequence)))}"`, []); })
+            .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), sess.password, (sess.nonce + parseInt(sequence)))}"`, []); })
             .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
         console.log('retval is');
         console.log(retval.toString());
