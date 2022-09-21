@@ -275,8 +275,11 @@ export class Session{
 		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }
 		if(fetchConn.data == null){ return retval.setError('DB Connection NULL error'); }
 		let client:DBCore.Client = fetchConn.data;
+		console.log('checking sequence in db');
+		console.log({purpose:purpose, reqSequence:reqSequence});
 		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[purpose,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
+		console.log({doseq:res.rows[0].doseq, reqSequence:reqSequence});
 		return retval.setData(res.rows[0].doseq == reqSequence);
 	}
 	

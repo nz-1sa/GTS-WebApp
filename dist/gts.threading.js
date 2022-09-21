@@ -348,7 +348,10 @@ class SequencedStartWaitingJob {
     }
     process(doLog) {
         return __awaiter(this, void 0, void 0, function* () {
+            //TODO: test decryption is legit  before sequence test/increment
             let res = yield this.seqCheck(this.uuid, this.purpose, this.reqSequence); // DB.actionSequence
+            console.log('double check is');
+            console.log(res);
             if (res.error) {
                 if (doLog) {
                     yield DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId, threadingLogGroup, this.uuid, 'SequencedStartLock', this.purpose, 'DB error checking sequence #' + this.reqSequence), this.uuid);
@@ -554,7 +557,7 @@ function doWithTimeout(uuid, timeout, action) {
                 if (!funcOver) {
                     funcOver = true;
                     console.log('timeout finished first');
-                    promiseDoneOrTimedout(null);
+                    promiseDoneOrTimedout([null, true]);
                     return;
                 }
                 console.log('timeout finished after doJob');
@@ -568,7 +571,7 @@ function doWithTimeout(uuid, timeout, action) {
                     //console.log('doJob finished first');
                     clearTimeout(ourTimeout);
                     //console.log('time limit timeout cleared');
-                    promiseDoneOrTimedout(res);
+                    promiseDoneOrTimedout([res, false]);
                     //console.log('promise resolved');
                     return;
                 }

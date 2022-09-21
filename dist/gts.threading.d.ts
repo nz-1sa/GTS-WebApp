@@ -14,7 +14,7 @@ export declare function doAllAsync(jobs: Function[], uuid: string, purpose: stri
 export declare function singleLock<T>(purpose: string, uuid: string, action: Function, doLog?: boolean): Promise<T>;
 export declare function sequencedStartLock<T>(uuid: string, purpose: string, reqSequence: number, expectedSequence: number, seqCheck: Function, action: Function, doLog?: boolean): Promise<T>;
 export declare function throttle<T>(uuid: string, purpose: string, delay: number, action: Function, doLog?: boolean): Promise<T>;
-export declare function doWithTimeout<T>(uuid: string, timeout: number, action: Function): Promise<T>;
+export declare function doWithTimeout<T>(uuid: string, timeout: number, action: Function): Promise<[T, boolean]>;
 export declare function attachThreadingDebugInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
 export declare class ThreadingLog {
     dbId: number;

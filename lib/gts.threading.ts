@@ -240,7 +240,10 @@ class SequencedStartWaitingJob{
 	}
 	
 	async process<T>(doLog:boolean): Promise<void>{
+		//TODO: test decryption is legit  before sequence test/increment
 		let res:GTS.DM.WrappedResult<boolean> = await this.seqCheck(this.uuid, this.purpose, this.reqSequence); // DB.actionSequence
+		console.log('double check is');
+		console.log(res);
 		if(res.error){
 			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'DB error checking sequence #'+this.reqSequence),this.uuid);}
 			this.reject('Sequene Check Error'); //TODO: Is this correct logic? Cancel the  job, how can we process them when there is an error checking sequence
@@ -368,11 +371,11 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 	return jobValueFirst;
 }
 
-export async function doWithTimeout<T>(uuid:string, timeout:number, action:Function):Promise<T>{
+export async function doWithTimeout<T>(uuid:string, timeout:number, action:Function):Promise<[T,boolean]>{
 	let funcOver:boolean = false;
 	var ourTimeout:NodeJS.Timeout;						// ability to cancel time limit if work is done first
 	var promiseDoneOrTimedout:Function;				// how we will resolve this promise
-	let p:Promise<T> = new Promise(function(resolve, reject){
+	let p:Promise<[T,boolean]> = new Promise(function(resolve, reject){
 		promiseDoneOrTimedout = resolve;
 	});
 	//console.log('done init');
@@ -389,7 +392,7 @@ export async function doWithTimeout<T>(uuid:string, timeout:number, action:Funct
 		if(!funcOver){
 			funcOver = true;
 			console.log('timeout finished first');
-			promiseDoneOrTimedout(null);
+			promiseDoneOrTimedout([null,true]);
 			return;
 		}
 		console.log('timeout finished after doJob');
@@ -402,7 +405,7 @@ export async function doWithTimeout<T>(uuid:string, timeout:number, action:Funct
 			//console.log('doJob finished first');
 			clearTimeout(ourTimeout);
 			//console.log('time limit timeout cleared');
-			promiseDoneOrTimedout(res);
+			promiseDoneOrTimedout([res,false]);
 			//console.log('promise resolved');
 			return;
 		}

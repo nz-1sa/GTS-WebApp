@@ -1,6 +1,7 @@
 import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
 import * as UUID from "./gts.uuid";
+import * as Threading from "./gts.threading";
 import * as Express from 'express';
 const PATH = require('path');
 
@@ -191,7 +192,14 @@ export class WebServerHelper{
 				logParams.push(`${name}=${val}`);
 			}
 			// get the response for the request
-			response = await work(uuid, req.ip, req.cookies, ...paramVals);
+			let timedOut = false;
+			[response,timedOut] = await Threading.doWithTimeout<WebResponse>(uuid, 90000, async function(uuid:string){return await work(uuid, req.ip, req.cookies, ...paramVals);});
+			
+			if(timedOut){
+				response = new WebResponse(false, 'ERROR: Processing request timed out', `Error, Processing request timed out while handling ${requestUrl}`,'');
+				res.send(response.toString());
+				return;
+			}
 			if(!response){
 				response = new WebResponse(false, 'ERROR: No response returned for request.', `Error, no response returned for handling ${requestUrl}`,'');
 				res.send(response.toString());

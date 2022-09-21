@@ -36,6 +36,7 @@ exports.DB = exports.Weblog = exports.WebResponse = exports.Cookie = exports.Web
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
+const Threading = __importStar(require("./gts.threading"));
 const PATH = require('path');
 class WebServerHelper {
     // initialise a new uuid register when the WebServerHelper is instantiated
@@ -229,7 +230,15 @@ class WebServerHelper {
                     logParams.push(`${name}=${val}`);
                 }
                 // get the response for the request
-                response = yield work(uuid, req.ip, req.cookies, ...paramVals);
+                let timedOut = false;
+                [response, timedOut] = yield Threading.doWithTimeout(uuid, 90000, function (uuid) {
+                    return __awaiter(this, void 0, void 0, function* () { return yield work(uuid, req.ip, req.cookies, ...paramVals); });
+                });
+                if (timedOut) {
+                    response = new WebResponse(false, 'ERROR: Processing request timed out', `Error, Processing request timed out while handling ${requestUrl}`, '');
+                    res.send(response.toString());
+                    return;
+                }
                 if (!response) {
                     response = new WebResponse(false, 'ERROR: No response returned for request.', `Error, no response returned for handling ${requestUrl}`, '');
                     res.send(response.toString());
