@@ -144,7 +144,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-	await Threading.sequencedStartLock<WS.WebResponse>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, seqNum:number){
+	await Threading.sequencedStartLock<WS.WebResponse>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, async function(uuid:string, purpose:string, seqNum:number){
 		console.log('talking at number #'+seqNum);
 		console.log({pass:s.password, nonce:s.nonce+seqNum});
 		
@@ -157,7 +157,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${uuid} Missing admin action {action}`,`""`,[]);
 		}
 		
-		return web.adminHandlers[action](uuid, requestIp, cookies, params);
+		return await web.adminHandlers[action](uuid, requestIp, cookies, params);
 		
 		
 	}, doLogSequenceCheck)

@@ -171,16 +171,18 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         let doLogSequenceCheck = true;
         let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
         yield Threading.sequencedStartLock(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, seqNum) {
-            console.log('talking at number #' + seqNum);
-            console.log({ pass: s.password, nonce: s.nonce + seqNum });
-            // decrypt challenge using knownSaltPassHash and captcha
-            let decoded = Encodec.decrypt(message, s.password, (s.nonce + seqNum));
-            const [action, params] = JSON.parse(decoded);
-            console.log({ action: action, params: params });
-            if (!web.adminHandlers[action]) {
-                return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${uuid} Missing admin action {action}`, `""`, []);
-            }
-            return web.adminHandlers[action](uuid, requestIp, cookies, params);
+            return __awaiter(this, void 0, void 0, function* () {
+                console.log('talking at number #' + seqNum);
+                console.log({ pass: s.password, nonce: s.nonce + seqNum });
+                // decrypt challenge using knownSaltPassHash and captcha
+                let decoded = Encodec.decrypt(message, s.password, (s.nonce + seqNum));
+                const [action, params] = JSON.parse(decoded);
+                console.log({ action: action, params: params });
+                if (!web.adminHandlers[action]) {
+                    return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${uuid} Missing admin action {action}`, `""`, []);
+                }
+                return yield web.adminHandlers[action](uuid, requestIp, cookies, params);
+            });
         }, doLogSequenceCheck)
             .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), s.password, (s.nonce + parseInt(sequence)))}"`, []); })
             .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });

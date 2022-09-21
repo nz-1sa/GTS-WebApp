@@ -1,7 +1,7 @@
 import * as GTS from "./gts";
 import * as Express from 'express';
 export interface IAdminHandlerFunction {
-    (uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>, params: GTS.DM.JSONValue): WebResponse;
+    (uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>, params: GTS.DM.JSONValue): Promise<WebResponse>;
 }
 export declare class WebServerHelper {
     private uuidRegister;
