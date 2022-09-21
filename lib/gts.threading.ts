@@ -252,6 +252,7 @@ class SequencedStartWaitingJob{
 		if(!doubleCheck){
 			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'Sequene check failed for #'+this.reqSequence),this.uuid);}
 			this.reject('Sequene Check Failed'); //TODO: Is this correct logic? Cancel the job if is the wrong sequence
+			return;
 		}
 		// Log and do the job
 		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'started job #'+this.reqSequence),this.uuid);}
