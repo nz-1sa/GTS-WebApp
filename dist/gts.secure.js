@@ -45,7 +45,7 @@ const { createCanvas } = require('canvas');
 const fs = require('fs');
 function attachWebInterface(web, webapp) {
     // serve login page from project root
-    webapp.get('/login', (req, res) => res.sendFile(web.getFile('../../login.html')));
+    webapp.get('/login', (req, res) => res.sendFile(web.getFile('login.html')));
     // a captcha is shown as part of starting a session
     web.registerHandlerUnchecked(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
