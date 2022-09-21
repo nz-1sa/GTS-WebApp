@@ -100,7 +100,7 @@ export class Session{
 			console.log({decoded:decoded});
 			return new WS.WebResponse(true,'',`UUID:${uuid} Successful talk`,`"${decoded}"`,[]);
 		}, doLogSequenceCheck)
-			.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, Encodec.encrypt(adminResponse.toString(),s.password, (s.nonce+parseInt(sequence))), []);} )
+			.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),s.password, (s.nonce+parseInt(sequence)))}"`, []);} )
 			.catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
 		console.log('retval is');
 		console.log(retval.toString());
