@@ -112,7 +112,7 @@ class Session {
             // by getting to here there is a logged in session
             let doLogSequenceCheck = true;
             let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-            yield Threading.sequencedStartLock(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, sequence) {
+            yield Threading.sequencedStartLock(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, sequence) {
                 console.log('talking at number #' + sequence);
                 console.log({ pass: s.password, nonce: s.nonce + sequence });
                 // decrypt challenge using knownSaltPassHash and captcha
@@ -355,7 +355,7 @@ class Session {
             return retval.setData(s);
         });
     }
-    static checkAndIncrementSequenceInDB(uuid, purpose, reqSequence) {
+    static checkAndIncrementSequenceInDB(uuid, sessionId, reqSequence) {
         return __awaiter(this, void 0, void 0, function* () {
             let retval = new GTS.DM.WrappedResult();
             let fetchConn = yield DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
@@ -367,8 +367,8 @@ class Session {
             }
             let client = fetchConn.data;
             console.log('checking sequence in db');
-            console.log({ purpose: purpose, reqSequence: reqSequence });
-            const res = yield client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)', [purpose, reqSequence, 0]);
+            console.log({ sessionId: sessionId, reqSequence: reqSequence });
+            const res = yield client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)', [sessionId, reqSequence, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }

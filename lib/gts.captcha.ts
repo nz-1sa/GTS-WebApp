@@ -91,7 +91,7 @@ export class Session{
 		// by getting to here there is a logged in session
 		let doLogSequenceCheck = true;
 		let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-		await Threading.sequencedStartLock<string>(uuid, 'SessionTalk', parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
+		await Threading.sequencedStartLock<string>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
 			console.log('talking at number #'+sequence);
 			console.log({pass:s.password, nonce:s.nonce+sequence});
 			
@@ -269,15 +269,15 @@ export class Session{
 		return retval.setData( s );
 	}
 	
-	static async checkAndIncrementSequenceInDB(uuid:string, purpose:string, reqSequence:number): Promise<GTS.DM.WrappedResult<boolean>>{
+	static async checkAndIncrementSequenceInDB(uuid:string, sessionId:string, reqSequence:number): Promise<GTS.DM.WrappedResult<boolean>>{
 		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
 		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }
 		if(fetchConn.data == null){ return retval.setError('DB Connection NULL error'); }
 		let client:DBCore.Client = fetchConn.data;
 		console.log('checking sequence in db');
-		console.log({purpose:purpose, reqSequence:reqSequence});
-		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[purpose,reqSequence,0]);
+		console.log({sessionId:sessionId, reqSequence:reqSequence});
+		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[sessionId,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
 		console.log({doseq:res.rows[0].doseq, reqSequence:reqSequence});
 		return retval.setData(res.rows[0].doseq == reqSequence);
