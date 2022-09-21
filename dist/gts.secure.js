@@ -171,10 +171,8 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         if (sess.status != SessionStatus.LoggedIn) {
             return new WS.WebResponse(false, "ERROR: Can only logout after loggin in", `UUID:${uuid} Logout called before login.`, '', []);
         }
-        //TODO: get knownSaltPassHash for email address from database
-        let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
-        // decrypt challenge using knownSaltPassHash and captcha
-        let decoded = Encodec.decrypt(challenge, knownSaltPassHash, 0);
+        // decrypt challenge using session password and 0 for sequence (allows always to logout, even if lose track of sequence at client)
+        let decoded = Encodec.decrypt(challenge, sess.password, 0);
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
             console.log('failed regex check');
             return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, decoded content failed regex check.`, '', []);
@@ -194,9 +192,9 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         sess.status = SessionStatus.LoggedOut;
         sess.updateDB(uuid);
         // encrypt and return to client the password to use for the session, and the nonce to start with
-        let plainTextResponse = JSON.stringify({ pass: sess.password, fluff: Math.floor(1 + Math.random() * 483600) });
+        let plainTextResponse = new Date().getTime().toString();
         console.log({ plainTextResponse: plainTextResponse });
-        let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, 0);
+        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
         console.log({ encResponse: encResponse });
         return new WS.WebResponse(true, "", `UUID:${uuid} Logout success`, `"${encResponse}"`);
     });
