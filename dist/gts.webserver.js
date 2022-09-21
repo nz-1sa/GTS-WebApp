@@ -42,6 +42,7 @@ class WebServerHelper {
     // initialise a new uuid register when the WebServerHelper is instantiated
     constructor(pSiteRoot) {
         this.siteRoot = '';
+        this.adminHandlers = {};
         this.uuidRegister = {};
         this.siteRoot = pSiteRoot; // set where files are served from
     }
@@ -65,9 +66,10 @@ class WebServerHelper {
             }));
         });
     }
-    registerAdminHandler(webapp, action, requiredParams, work) {
+    // store the function to return a response for an admin request
+    registerAdminHandler(action, work) {
         return __awaiter(this, void 0, void 0, function* () {
-            //TODO: link with Session.handleSecureTalk
+            this.adminHandlers[action] = work;
         });
     }
     getUUID() {

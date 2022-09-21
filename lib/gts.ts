@@ -12,6 +12,7 @@ export namespace DM{
 		[key: string]: T;
 	}
 	
+	// Create a type for JSON. https://github.com/microsoft/TypeScript/issues/1897#issuecomment-822032151
 	export type JSONValue = 
 		 | string
 		 | number

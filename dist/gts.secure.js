@@ -63,7 +63,7 @@ function attachWebInterface(web, webapp) {
     //NOTE: requests to the server must be received in sequence. Message is encrypted
     web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield handleSecureTalk(uuid, requestIp, cookies, sequence, message);
+            return yield handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
         });
     });
 }
@@ -149,7 +149,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
     });
 }
 // secure talk within a session
-function handleSecureTalk(uuid, requestIp, cookies, sequence, message) {
+function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('handleSecureTalk');
         console.log({ uuid: uuid, requestIp: requestIp, cookies: cookies, sequence: sequence });
@@ -177,7 +177,10 @@ function handleSecureTalk(uuid, requestIp, cookies, sequence, message) {
             let decoded = Encodec.decrypt(message, s.password, (s.nonce + seqNum));
             const [action, params] = JSON.parse(decoded);
             console.log({ action: action, params: params });
-            return new WS.WebResponse(true, '', `UUID:${uuid} Successful talk`, `"${action}"`, []);
+            if (!web.adminHandlers[action]) {
+                return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${uuid} Missing admin action {action}`, `""`, []);
+            }
+            return web.adminHandlers[action](uuid, requestIp, cookies, params);
         }, doLogSequenceCheck)
             .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), s.password, (s.nonce + parseInt(sequence)))}"`, []); })
             .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });

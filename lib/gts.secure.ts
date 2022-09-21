@@ -32,7 +32,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	
 	//NOTE: requests to the server must be received in sequence. Message is encrypted
 	web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
-		return await handleSecureTalk(uuid, requestIp, cookies, sequence, message);
+		return await handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
 	});
 }
 
@@ -124,7 +124,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 }
 
 // secure talk within a session
-async function handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
+async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
 	console.log('handleSecureTalk');
 	console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
@@ -152,7 +152,14 @@ async function handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.Ha
 		let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+seqNum));
 		const [action,params] = JSON.parse(decoded);
 		console.log({action:action, params:params});
-		return new WS.WebResponse(true,'',`UUID:${uuid} Successful talk`,`"${action}"`,[]);
+		
+		if(!web.adminHandlers[action]){
+			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${uuid} Missing admin action {action}`,`""`,[]);
+		}
+		
+		return web.adminHandlers[action](uuid, requestIp, cookies, params);
+		
+		
 	}, doLogSequenceCheck)
 		.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),s.password, (s.nonce+parseInt(sequence)))}"`, []);} )
 		.catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );

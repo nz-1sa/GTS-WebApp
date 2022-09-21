@@ -5,6 +5,10 @@ import * as Threading from "./gts.threading";
 import * as Express from 'express';
 const PATH = require('path');
 
+export interface IAdminHandlerFunction {
+	(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, params:GTS.DM.JSONValue):WebResponse;
+}
+
 export class WebServerHelper{
 	// store which uuids are in use
 	// each request gets an uuid
@@ -38,8 +42,11 @@ export class WebServerHelper{
 		});
 	}
 	
-	public async registerAdminHandler(webapp:Express.Application, action:string, requiredParams:string[], work:Function):Promise<void>{
-		//TODO: link with Session.handleSecureTalk
+	public adminHandlers:GTS.DM.HashTable<IAdminHandlerFunction> = {};
+	
+	// store the function to return a response for an admin request
+	public async registerAdminHandler(action:string, work:IAdminHandlerFunction):Promise<void>{
+		this.adminHandlers[action] = work;
 	}
 	
 	private async getUUID(): Promise<string>{

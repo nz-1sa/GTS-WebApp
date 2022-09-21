@@ -1,5 +1,8 @@
 import * as GTS from "./gts";
 import * as Express from 'express';
+export interface IAdminHandlerFunction {
+    (uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>, params: GTS.DM.JSONValue): WebResponse;
+}
 export declare class WebServerHelper {
     private uuidRegister;
     private siteRoot;
@@ -7,7 +10,8 @@ export declare class WebServerHelper {
     getFile(fileName: string): string;
     registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
     registerHandlerUnchecked(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
-    registerAdminHandler(webapp: Express.Application, action: string, requiredParams: string[], work: Function): Promise<void>;
+    adminHandlers: GTS.DM.HashTable<IAdminHandlerFunction>;
+    registerAdminHandler(action: string, work: IAdminHandlerFunction): Promise<void>;
     private getUUID;
     private releaseUUID;
     private handleRequest;
