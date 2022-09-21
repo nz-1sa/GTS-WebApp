@@ -7,6 +7,9 @@ export declare namespace DM {
     interface HashTable<T> {
         [key: string]: T;
     }
+    type JSONValue = string | number | boolean | null | JSONValue[] | {
+        [key: string]: JSONValue;
+    };
     class TypedStringVal {
         type: string;
         value: string;
