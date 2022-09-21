@@ -11,6 +11,14 @@ export namespace DM{
 	export interface HashTable<T> {
 		[key: string]: T;
 	}
+	
+	export type JSONValue = 
+		 | string
+		 | number
+		 | boolean
+		 | null
+		 | JSONValue[]
+		 | {[key: string]: JSONValue}
 
 	// Allow extra info to be stored about a string value,		loosely typed subclassing of string
 	export class TypedStringVal{
