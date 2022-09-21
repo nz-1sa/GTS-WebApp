@@ -119,6 +119,8 @@ class Session {
                 let decoded = Encodec.decrypt(message, s.password, (s.nonce + sequence));
                 console.log({ decoded: decoded });
             }, doLogSequenceCheck).then(decoded => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, decoded, []); }).catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
+            console.log('retval is');
+            console.log(retval);
             return retval;
         });
     }
