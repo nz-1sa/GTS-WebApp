@@ -118,10 +118,12 @@ class Session {
                 // decrypt challenge using knownSaltPassHash and captcha
                 let decoded = Encodec.decrypt(message, s.password, (s.nonce + sequence));
                 console.log({ decoded: decoded });
-                return decoded;
-            }, doLogSequenceCheck).then(decoded => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, decoded, []); }).catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
+                return new WS.WebResponse(true, '', `UUID:${uuid} Successful talk`, `"${decoded}"`, []);
+            }, doLogSequenceCheck)
+                .then(adminResponse => { retval = adminResponse; })
+                .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
             console.log('retval is');
-            console.log(retval);
+            console.log(retval.toString());
             return retval;
         });
     }
