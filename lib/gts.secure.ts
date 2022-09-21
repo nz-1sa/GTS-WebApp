@@ -5,14 +5,161 @@ import * as WS from "./gts.webserver";
 import * as Express from 'express';
 import *  as WebApp from './gts.webapp';
 import * as Threading from "./gts.threading";
-const PATH = require( 'path' );
-const WEB:WebApp.WS.WebServerHelper = new WebApp.WS.WebServerHelper( PATH.join( __dirname, '..' ) );
 var crypto = require('crypto');
 import * as Encodec from './gts.encodec';
 
 const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
+
+export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
+		
+	// serve login page from project root
+	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( '../../login.html' ) ) );
+	
+	// a captcha is shown as part of starting a session
+	web.registerHandlerUnchecked(webapp, '/api/startSession', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+		return await handleStartSessionRequest(uuid, requestIp, cookies);
+	});
+	
+	// login by email, password, and captcha
+	//TODO: email should be SHA1 hash
+	web.registerHandlerUnchecked(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
+		return await handleLoginRequest(uuid, requestIp, cookies, email, challenge);
+	});
+	
+	//TODO: support log out
+	
+	//NOTE: requests to the server must be received in sequence. Message is encrypted
+	web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+		return await handleSecureTalk(uuid, requestIp, cookies, sequence, message);
+	});
+}
+
+// establish a session to allow logging in
+async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<WS.WebResponse>{
+	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+	if(hs && s){
+		if(s!.status == SessionStatus.LoggedIn){
+			return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`,`Already logged in`, []);
+		}
+		return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
+	}
+	let now:Date = new Date();
+	
+	const loopSafety:number = 20;
+	let loopIteration:number = 1;
+	let sessionId:string = uuid;
+	while(!Session.isProposedSessionIdUnique(uuid, sessionId) && loopIteration<=loopSafety){
+		console.log('handling sessionId clash');
+		sessionId = await UUID.newUUID();
+		loopIteration++;
+	}
+	if(loopIteration == loopSafety){
+		return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
+	}
+	// pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
+	let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
+	ns.addToDB(uuid);
+	ns.initialiseCaptcha(uuid, sessionId);
+	return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
+}
+
+// process login for a session
+async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string):Promise<WS.WebResponse>{
+	// check that there is an open session to log in to
+	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+	if(!hs || !s){
+		return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`,'', []);
+	}
+	let sess:Session = s!;
+	if(sess.status != SessionStatus.Initialised){
+		return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
+	}
+	
+	//TODO: get knownSaltPassHash for email address from database
+	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
+	
+	console.log('using debug key to decode');
+	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
+	
+	// decrypt challenge using knownSaltPassHash and captcha
+	let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
+	
+	console.log({decoded:decoded});
+	
+	if(!new RegExp("^[0-9]+$", "g").test(decoded)){
+		console.log('failed regex check');
+		return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`,'', []);
+	}
+	
+	// verify decrypted challenge content
+	if( parseInt(decoded) == NaN ){
+		console.log('failed NaN check');
+		return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`,'', []);
+	}
+	let now:number = new Date().getTime();
+	let timeDiff= now-parseInt(decoded);
+	console.log({now:now, timeDiff:timeDiff});
+	if(timeDiff < 0 || timeDiff > 20000 ){	// request must arrive within 20 seconds
+		console.log('failed Date check');
+		return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
+	}
+	
+	// generate password and nonce for the session
+	console.log('setting session credentials');
+	sess.status = SessionStatus.LoggedIn;
+	sess.password = await Session.genSessionPassword();
+	sess.nonce = Math.floor(1+Math.random()*483600);
+	sess.seq = 1;
+	sess.updateDB(uuid);
+	console.log({sess:sess});
+	
+	// encrypt and return to client the password to use for the session, and the nonce to start with
+	let plainTextResponse = JSON.stringify({pass:sess.password, nonce:sess.nonce});
+	console.log({plainTextResponse:plainTextResponse});
+	let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
+	console.log({encResponse:encResponse});
+	return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
+}
+
+// secure talk within a session
+async function handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
+	console.log('handleSecureTalk');
+	console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
+	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+	if(!hs){
+		return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`,'', []);
+	}
+	if(!s){
+		return new WS.WebResponse(false, "ERROR: Failed to connect to session.", `UUID:${uuid} Error getting session from DB`,'', []);
+	}
+	if(s!.status != SessionStatus.LoggedIn){
+		return new WS.WebResponse(false, "ERROR: Need to login first.", `UUID:${uuid} Attempted session talk before login`,'', []);
+	};
+	if(!new RegExp("^[0-9]+$", "g").test(sequence)){
+		return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence fails regex check`,'', []);
+	}
+	
+	// by getting to here there is a logged in session
+	let doLogSequenceCheck = true;
+	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
+	await Threading.sequencedStartLock<WS.WebResponse>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, seqNum:number){
+		console.log('talking at number #'+seqNum);
+		console.log({pass:s.password, nonce:s.nonce+seqNum});
+		
+		// decrypt challenge using knownSaltPassHash and captcha
+		let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+seqNum));
+		const [action,params] = JSON.parse(decoded);
+		console.log({action:action, params:params});
+		return new WS.WebResponse(true,'',`UUID:${uuid} Successful talk`,`"${action}"`,[]);
+	}, doLogSequenceCheck)
+		.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),s.password, (s.nonce+parseInt(sequence)))}"`, []);} )
+		.catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
+	console.log('retval is');
+	console.log(retval.toString());
+	return retval;
+}
 
 export enum SessionStatus{
 	Initialised = 1,
@@ -45,152 +192,6 @@ export class Session{
 		this.password = pPassword;
 		this.seq = pSeq;
 		this.chkSum = pChkSum;
-	}
-	
-	static attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
-		
-		// serve login page from project root
-		webapp.get( '/login', ( req, res ) => res.sendFile( WEB.getFile( '../../login.html' ) ) );
-		
-		// a captcha is shown as part of starting a session
-		web.registerHandlerUnchecked(webapp, '/api/startSession', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
-			return await Session.handleStartSessionRequest(uuid, requestIp, cookies);
-		});
-		
-		// login by email, password, and captcha
-		//TODO: email should be SHA1 hash
-		web.registerHandlerUnchecked(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
-			return await Session.handleLoginRequest(uuid, requestIp, cookies, email, challenge);
-		});
-		
-		//NOTE: requests to the server must be received in the order of nonce
-		//TODO: will need to make a handler to hold and sort them as they arrive to process
-		web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
-			return await Session.handleSecureTalk(uuid, requestIp, cookies, sequence, message);
-		});
-		
-	}
-	
-	private static async handleSecureTalk(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
-		console.log('handleSecureTalk');
-		console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
-		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
-		if(!hs){
-			return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`,'', []);
-		}
-		if(!s){
-			return new WS.WebResponse(false, "ERROR: Failed to connect to session.", `UUID:${uuid} Error getting session from DB`,'', []);
-		}
-		if(s!.status != SessionStatus.LoggedIn){
-			return new WS.WebResponse(false, "ERROR: Need to login first.", `UUID:${uuid} Attempted session talk before login`,'', []);
-		};
-		if(!new RegExp("^[0-9]+$", "g").test(sequence)){
-			return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence fails regex check`,'', []);
-		}
-		
-		// by getting to here there is a logged in session
-		let doLogSequenceCheck = true;
-		let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-		await Threading.sequencedStartLock<WS.WebResponse>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, seqNum:number){
-			console.log('talking at number #'+seqNum);
-			console.log({pass:s.password, nonce:s.nonce+seqNum});
-			
-			// decrypt challenge using knownSaltPassHash and captcha
-			let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+seqNum));
-			const [action,params] = JSON.parse(decoded);
-			console.log({action:action, params:params});
-			return new WS.WebResponse(true,'',`UUID:${uuid} Successful talk`,`"${action}"`,[]);
-		}, doLogSequenceCheck)
-			.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),s.password, (s.nonce+parseInt(sequence)))}"`, []);} )
-			.catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
-		console.log('retval is');
-		console.log(retval.toString());
-		return retval;
-	}
-	
-	private static async handleStartSessionRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<WS.WebResponse>{
-		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
-		if(hs && s){
-			if(s!.status == SessionStatus.LoggedIn){
-				return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`,`Already logged in`, []);
-			}
-			return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
-		}
-		let now:Date = new Date();
-		
-		const loopSafety:number = 20;
-		let loopIteration:number = 1;
-		let sessionId:string = uuid;
-		while(!Session.isProposedSessionIdUnique(uuid, sessionId) && loopIteration<=loopSafety){
-			console.log('handling sessionId clash');
-			sessionId = await UUID.newUUID();
-			loopIteration++;
-		}
-		if(loopIteration == loopSafety){
-			return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
-		}
-		// pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
-		let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
-		ns.addToDB(uuid);
-		ns.initialiseCaptcha(uuid, sessionId);
-		return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
-	}
-	
-	private static async handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string):Promise<WS.WebResponse>{
-		// check that there is an open session to log in to
-		const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
-		if(!hs || !s){
-			return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`,'', []);
-		}
-		let sess:Session = s!;
-		if(sess.status != SessionStatus.Initialised){
-			return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
-		}
-		
-		//TODO: get knownSaltPassHash for email address from database
-		let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
-		
-		console.log('using debug key to decode');
-		console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
-		
-		// decrypt challenge using knownSaltPassHash and captcha
-		let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
-		
-		console.log({decoded:decoded});
-		
-		if(!new RegExp("^[0-9]+$", "g").test(decoded)){
-			console.log('failed regex check');
-			return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`,'', []);
-		}
-		
-		// verify decrypted challenge content
-		if( parseInt(decoded) == NaN ){
-			console.log('failed NaN check');
-			return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, invalid decoded content.`,'', []);
-		}
-		let now:number = new Date().getTime();
-		let timeDiff= now-parseInt(decoded);
-		console.log({now:now, timeDiff:timeDiff});
-		if(timeDiff < 0 || timeDiff > 20000 ){	// request must arrive within 20 seconds
-			console.log('failed Date check');
-			return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`,'', []);
-		}
-		
-		// generate password and nonce for the session
-		console.log('setting session credentials');
-		sess.status = SessionStatus.LoggedIn;
-		sess.password = await Session.genSessionPassword();
-		sess.nonce = Math.floor(1+Math.random()*483600);
-		sess.seq = 1;
-		sess.updateDB(uuid);
-		console.log({sess:sess});
-		
-		// encrypt and return to client the password to use for the session, and the nonce to start with
-		let plainTextResponse = JSON.stringify({pass:sess.password, nonce:sess.nonce});
-		console.log({plainTextResponse:plainTextResponse});
-		let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
-		console.log({encResponse:encResponse});
-		return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
 	}
 	
 	// base64 sha1 hash of the session's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
@@ -485,7 +486,7 @@ export class Session{
 	}
 
 	// generate a password to use for the session ot reduce the usage and hence attack surface of the users password
-	private static async genSessionPassword(){
+	static async genSessionPassword(){
 		let passwordChars = new Array(16);
 		async function assignRandomChar(index:number){
 			passwordChars[index] = await Session.randomPassChar();

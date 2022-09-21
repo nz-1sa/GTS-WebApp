@@ -65,6 +65,11 @@ class WebServerHelper {
             }));
         });
     }
+    registerAdminHandler(webapp, action, requiredParams, work) {
+        return __awaiter(this, void 0, void 0, function* () {
+            //TODO: link with Session.handleSecureTalk
+        });
+    }
     getUUID() {
         return __awaiter(this, void 0, void 0, function* () {
             const loopSafety = 20;

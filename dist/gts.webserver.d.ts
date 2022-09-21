@@ -7,6 +7,7 @@ export declare class WebServerHelper {
     getFile(fileName: string): string;
     registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
     registerHandlerUnchecked(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    registerAdminHandler(webapp: Express.Application, action: string, requiredParams: string[], work: Function): Promise<void>;
     private getUUID;
     private releaseUUID;
     private handleRequest;

@@ -38,6 +38,10 @@ export class WebServerHelper{
 		});
 	}
 	
+	public async registerAdminHandler(webapp:Express.Application, action:string, requiredParams:string[], work:Function):Promise<void>{
+		//TODO: link with Session.handleSecureTalk
+	}
+	
 	private async getUUID(): Promise<string>{
 		const loopSafety:number = 20;
 		let loopIteration:number = 1;

@@ -8,7 +8,7 @@ export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
 export * as Threading from "./gts.threading";
-export * as Captcha from "./gts.captcha";
+export * as Secure from "./gts.secure";
 export * as Encodec from "./gts.encodec";
 
 // quicker reference to commly used types
