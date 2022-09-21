@@ -90,16 +90,15 @@ export class Session{
 		
 		// by getting to here there is a logged in session
 		let doLogSequenceCheck = true;
-		let decoded:string = '';
 		let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
 		await Threading.sequencedStartLock<string>(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function(uuid:string, purpose:string, sequence:number){
 			console.log('talking at number #'+sequence);
 			console.log({pass:s.password, nonce:s.nonce+sequence});
 			
 			// decrypt challenge using knownSaltPassHash and captcha
-			decoded = Encodec.decrypt(message, s.password, (s.nonce+sequence));
-			
+			let decoded:string = Encodec.decrypt(message, s.password, (s.nonce+sequence));
 			console.log({decoded:decoded});
+			return decoded;
 		}, doLogSequenceCheck).then(decoded => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, decoded, []);} ).catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
 		console.log('retval is');
 		console.log(retval);
