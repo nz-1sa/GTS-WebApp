@@ -181,7 +181,10 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                 if (!web.adminHandlers[action]) {
                     return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${uuid} Missing admin action {action}`, `""`, []);
                 }
-                return yield web.adminHandlers[action](uuid, requestIp, cookies, params);
+                let adminResp = yield web.adminHandlers[action](uuid, requestIp, cookies, params);
+                console.log('admin response is');
+                console.log(adminResp);
+                return adminResp;
             });
         }, doLogSequenceCheck)
             .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), s.password, (s.nonce + parseInt(sequence)))}"`, []); })

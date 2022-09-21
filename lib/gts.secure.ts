@@ -157,7 +157,11 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${uuid} Missing admin action {action}`,`""`,[]);
 		}
 		
-		return await web.adminHandlers[action](uuid, requestIp, cookies, params);
+		let adminResp:WS.WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, params);
+		console.log('admin response is');
+		console.log(adminResp);
+		
+		return adminResp;
 		
 		
 	}, doLogSequenceCheck)
