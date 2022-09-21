@@ -112,15 +112,15 @@ class Session {
             // by getting to here there is a logged in session
             let doLogSequenceCheck = true;
             let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-            yield Threading.sequencedStartLock(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, sequence) {
-                console.log('talking at number #' + sequence);
-                console.log({ pass: s.password, nonce: s.nonce + sequence });
+            yield Threading.sequencedStartLock(uuid, s.sessionId, parseInt(sequence), s.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, seqNum) {
+                console.log('talking at number #' + seqNum);
+                console.log({ pass: s.password, nonce: s.nonce + seqNum });
                 // decrypt challenge using knownSaltPassHash and captcha
-                let decoded = Encodec.decrypt(message, s.password, (s.nonce + sequence));
+                let decoded = Encodec.decrypt(message, s.password, (s.nonce + seqNum));
                 console.log({ decoded: decoded });
                 return new WS.WebResponse(true, '', `UUID:${uuid} Successful talk`, `"${decoded}"`, []);
             }, doLogSequenceCheck)
-                .then(adminResponse => { retval = adminResponse; })
+                .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, Encodec.encrypt(adminResponse.toString(), s.password, (s.nonce + parseInt(sequence))), []); })
                 .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
             console.log('retval is');
             console.log(retval.toString());
