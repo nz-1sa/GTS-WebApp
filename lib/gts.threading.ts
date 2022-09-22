@@ -7,6 +7,12 @@ const doLogging:boolean = false;												// if thread debug logging is being 
 let threadingLogId:number = 0;													// incrementing ids for sequencing of log entries
 const threadingLogGroup:number = new Date().getTime();		// single server, the id is in groups of when the file loaded
 
+// shorthand to add log if logging is enabled
+async function addThreadingLog( pUuid:string, pType:string, pPurpose:string, pAction:string, doLog?:boolean){
+	if(doLog===undefined){ doLog = doLogging; }
+	if(doLog!){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,pUuid,pType,pPurpose,pAction),pUuid);}
+}
+
 
 
 // introduce a delay in code by allowing await for a setTimeout
@@ -43,21 +49,21 @@ export async function delayCancellable(ms:number):Promise<CancellableDelay>{
 let doOnceStatus:GTS.DM.HashTable<number> = {};
 let doOnceWaiting:GTS.DM.HashTable<DoOnceWaitingJob[]> = {};
 export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:Function):Promise<T>{
-	if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'entered function'),uuid);}
+	await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'entered function');
 	let jobStatus:number = doOnceStatus[purpose]?doOnceStatus[purpose]:0;
 	doOnceStatus[purpose] = ++jobStatus;
 	if(!doOnceWaiting[purpose]){doOnceWaiting[purpose]=[];}
 	var jobValue:T;
 	if(jobStatus == 1){		// first in, do the job
-		if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'starting job'),uuid);}
+		await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'starting job');
 		jobValue = await action(uuid);
-		if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'finished job'),uuid);}
+		await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'finished job');
 		doOnceStatus[purpose] = jobStatus = 100;	// flag the job has been done, no more threads will be added now to waiting to resolve
 		// release any threads waiting on the completion of the job
 		let waitingToResolve = doOnceWaiting[purpose];
 		for(var i=0; i<waitingToResolve.length; i++){
 			waitingToResolve[i].resolve(jobValue);												// let any and all waiting in the que proceed now the job is done
-			if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,waitingToResolve[i].uuid,'multiThreadDoOnce',purpose,'resumed thread waiting for job'),uuid);}
+			await addThreadingLog(waitingToResolve[i].uuid,'multiThreadDoOnce',purpose,'resumed thread waiting for job');
 		}
 		waitingToResolve = doOnceWaiting[purpose] = [];		// clear list now they are all resolved
 		return new Promise(function(resolve, reject){resolve(jobValue)});
@@ -65,7 +71,7 @@ export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:F
 	if(jobStatus < 100){// que additional requests that arrive while the job is being done
 		doOnceStatus[purpose] = --jobStatus;		// keep tracing value low, while waiting for the job to be done
 		return new Promise(async function(resolve, reject){
-			if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'Pausing thread while waiting for job'),uuid);}
+			await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'Pausing thread while waiting for job');
 			doOnceWaiting[purpose].push({uuid:uuid,resolve:resolve});
 		});
 	}
@@ -73,13 +79,13 @@ export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:F
 		doOnceStatus[purpose] = jobStatus = 100;	// numbers 100 and above show the job has been done
 	}
 	// nothing to do as it was already done once
-	if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'multiThreadDoOnce',purpose,'job was already completed'),uuid);}
+	await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'job was already completed');
 	return new Promise(function(resolve, reject){resolve(jobValue)});
 }
 
 // start a bunch of async functions and continue once they are all done
 export async function doAllAsync( jobs:Function[] , uuid:string, purpose:string):Promise<void>{
-	if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'doAllAsync',purpose,'start with '+jobs.length+' jobs'),uuid);}
+	await addThreadingLog(uuid,'doAllAsync',purpose,'start with '+jobs.length+' jobs');
 	// create an array to track when each job provided is completed
 	let results:boolean[] = new Array(jobs.length).fill(false);
 	// return a promise we will notify when all jobs have been done
@@ -90,7 +96,7 @@ export async function doAllAsync( jobs:Function[] , uuid:string, purpose:string)
 	
 	// asynchronously start all the jobs
 	for(var i:number=0; i<jobs.length; i++){
-		if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'doAllAsync',purpose,`started job ${i}`),uuid);}
+		await addThreadingLog(uuid,'doAllAsync',purpose,`started job ${i}`);
 		doJob(i, uuid, purpose);		// continue without waiting for job to complete
 	}
 	return p;
@@ -102,11 +108,10 @@ export async function doAllAsync( jobs:Function[] , uuid:string, purpose:string)
 		
 		// if all jobs are done resolve our promise to notify when all are done
 		if(results.every(Boolean)){
-			if(doLogging){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'doAllAsync',purpose,`finished job ${i}, all jobs done`),uuid);}
+			await addThreadingLog(uuid,'doAllAsync',purpose,`finished job ${i}, all jobs done`);
 			promiseAllResolve();
-		} else if(doLogging){
-			await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'doAllAsync',purpose,`finished job ${i}`),uuid)
 		}
+		await addThreadingLog(uuid,'doAllAsync',purpose,`finished job ${i}`);
 	}
 }
 
@@ -115,7 +120,7 @@ let singleLockWaiting:GTS.DM.HashTable<SingleLockWaitingJob[]> = {};
 // Que jobs doing each on in turn in the order they arrive
 export async function singleLock<T>(purpose:string, uuid:string, action:Function, doLog?:boolean):Promise<T>{
 	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'new job/thread arrives'),uuid);}
+	await addThreadingLog(uuid,'SingleLock',purpose,'new job/thread arrives', doLog);
 	//console.log(`${uuid} ${purpose} singleLock`);
 	// find out if there is currently a job being processed as this one arrives to be done
 	if(!singleLockWaiting[purpose]){singleLockWaiting[purpose]=[];}
@@ -124,60 +129,60 @@ export async function singleLock<T>(purpose:string, uuid:string, action:Function
 	// if there is a job being processed
 	if(jobProcessing){
 		let existingJobCount:number = singleLockWaiting[purpose].length;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'job already being processed, '+existingJobCount+' jobs in the que'),uuid);}
+		await addThreadingLog(uuid,'SingleLock',purpose,'job already being processed, '+existingJobCount+' jobs in the que', doLog);
 		//console.log(`${uuid} ${purpose} job already being processed, ${existingJobCount} jobs in the que`);
 		// return a promise that the job will be done when it can be
 		return new Promise(async function(resolve, reject){
 			// que this job to be done when possible
 			singleLockWaiting[purpose].push({uuid:uuid, action:action, resolve:resolve, process:async function(uuid:string,action:Function,resolve:Function){
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'qued job being processed'),uuid);}
+				await addThreadingLog(uuid,'SingleLock',purpose,'qued job being processed', doLog);
 				//console.log(`${uuid} ${purpose} qued job being processed`);
 				// do this job when the time comes
 				let jobValue:T = await action(uuid);
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'qued job done'),uuid);}
+				await addThreadingLog(uuid,'SingleLock',purpose,'qued job done', doLog);
 				//console.log(`${uuid} ${purpose} qued job done`);
 				let r = singleLockWaiting[purpose].shift();
 				if(r){
 					// and when it is done process the next job in the que if any
 					let existingJobCount:number = singleLockWaiting[purpose].length;
-					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'got another qued job, '+existingJobCount+' more in que'),uuid);}
+					await addThreadingLog(uuid,'SingleLock',purpose,'got another qued job, '+existingJobCount+' more in que', doLog);
 					//console.log(`${uuid} ${purpose} found another job qued`);
 					r.process(r.uuid,r.action,r.resolve);
 				}else{
 					// flag that processing is finished if we have just done the last job in the que
 					jobProcessing = singleLockStatus[purpose] = false;
-					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'que finished'),uuid);}
+					await addThreadingLog(uuid,'SingleLock',purpose,'que finished', doLog);
 					//console.log(`${uuid} ${purpose} que finished`);
 				}
 				// let the thread continue that was waiting for the job to be done
 				resolve(jobValue);
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'job/thread released'),uuid);}
+				await addThreadingLog(uuid,'SingleLock',purpose,'job/thread released');
 				//console.log(`${uuid} ${purpose} qued job released`);
 			}});
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'job qued'),uuid);}
+			await addThreadingLog(uuid,'SingleLock',purpose,'job qued', doLog);
 		});
 	}
 	// start the job if there are no others to wait for
 	singleLockStatus[purpose] = jobProcessing = true;
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'start processing job'),uuid);}
+	await addThreadingLog(uuid,'SingleLock',purpose,'start processing job', doLog);
 	//console.log(`${uuid} ${purpose} start processing job`);
 	let jobValueFirst:T = await action(uuid);
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'job done'),uuid);}
+	await addThreadingLog(uuid,'SingleLock',purpose,'job done', doLog);
 	//console.log(`${uuid} ${purpose} job done`);
 	let r = singleLockWaiting[purpose].shift();
 	if(r){
 		// and when it is done process a job in the que if any
 		let existingJobCount:number = singleLockWaiting[purpose].length;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'got a qued job, '+existingJobCount+' more in que'),uuid);}
+		await addThreadingLog(uuid,'SingleLock',purpose,'got a qued job, '+existingJobCount+' more in que', doLog);
 		//console.log(`${uuid} ${purpose} found a qued job`);
 		r.process(r.uuid,r.action,r.resolve);
 	}else{
 		// flag that processing is finished if there is no que
 		jobProcessing = singleLockStatus[purpose] = false;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'que not used'),uuid);}
+		await addThreadingLog(uuid,'SingleLock',purpose,'que not used', doLog);
 	}
 	// let the thread continue that called to have the job done
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SingleLock',purpose,'job released'),uuid);}
+	await addThreadingLog(uuid,'SingleLock',purpose,'job released', doLog);
 	//console.log(`${uuid} ${purpose} job released`);
 	return jobValueFirst;
 }
@@ -188,12 +193,12 @@ export async function sequencedStartLock<T>(uuid:string, purpose:string, reqSequ
 	if(!sequencedStartJobsWaiting[purpose]){sequencedStartJobsWaiting[purpose]={};}	// ensure storage defined for purpose
 	// just do the request if it is in the correct order
 	if(reqSequence==expectedSequence){
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for expected sequence #'+reqSequence),uuid);}
+		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for expected sequence #'+reqSequence, doLog);
 		// remove store if previous request was qued for the sequence we are processing now
 		let cur:string = reqSequence.toString();
 		if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
 			delete sequencedStartJobsWaiting[purpose][cur];
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'deleted prequed job for #'+reqSequence+' as a new request arrived at the expected sequence'),uuid);}
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'deleted prequed job for #'+reqSequence+' as a new request arrived at the expected sequence');
 		}
 		return new Promise(async function(resolve, reject){
 			let curJob:SequencedStartWaitingJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
@@ -201,21 +206,21 @@ export async function sequencedStartLock<T>(uuid:string, purpose:string, reqSequ
 		});
 	}
 	if(reqSequence < expectedSequence){
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for already started, expected '+expectedSequence+' and got sequence #'+reqSequence),uuid);}
+		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for already started, expected '+expectedSequence+' and got sequence #'+reqSequence);
 		return Promise.reject('incorrect sequence');
 	}
 	if(reqSequence < (expectedSequence+11)){
 		let key = reqSequence.toString();
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'will que future job #'+reqSequence+' as are almost there from '+expectedSequence),uuid);}
+		await addThreadingLog(uuid,'SequencedStartLock',purpose,'will que future job #'+reqSequence+' as are almost there from '+expectedSequence, doLog);
 			
 		// return a promise that the job will be done on its turn
 		return new Promise(async function(resolve, reject){
 			let quedJob:SequencedStartWaitingJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
 			sequencedStartJobsWaiting[purpose][key] = quedJob;
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job qued #'+reqSequence),uuid);}
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'job qued #'+reqSequence, doLog);
 		});
 	} else {
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'SequencedStartLock',purpose,'job arrived for too far in the future, wanted '+expectedSequence+' and got sequence #'+reqSequence),uuid);}
+		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for too far in the future, wanted '+expectedSequence+' and got sequence #'+reqSequence, doLog);
 		return Promise.reject('incorrect sequence');
 	}
 }
@@ -245,24 +250,24 @@ class SequencedStartWaitingJob{
 		console.log('double check is');
 		console.log(res);
 		if(res.error){
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'DB error checking sequence #'+this.reqSequence),this.uuid);}
+			await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'DB error checking sequence #'+this.reqSequence, doLog);
 			this.reject('Sequene Check Error'); //TODO: Is this correct logic? Cancel the  job, how can we process them when there is an error checking sequence
 		}
 		let doubleCheck:boolean = res.data!;
 		if(!doubleCheck){
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'Sequene check failed for #'+this.reqSequence),this.uuid);}
+			await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'Sequene check failed for #'+this.reqSequence, doLog);
 			this.reject('Sequene Check Failed'); //TODO: Is this correct logic? Cancel the job if is the wrong sequence
 			return;
 		}
 		// Log and do the job
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'started job #'+this.reqSequence),this.uuid);}
+		await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'started job #'+this.reqSequence, doLog);
 		let jobValue:T = await this.action(this.uuid, this.purpose, this.reqSequence);
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'finished job #'+this.reqSequence),this.uuid);}
+		await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'finished job #'+this.reqSequence, doLog);
 		
 		// Check if there is a next job waiting
 		let next:string = (this.reqSequence+1).toString();
 		if (sequencedStartJobsWaiting[this.purpose].hasOwnProperty(next)) {
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'continuing to next job, #'+next+' afer doing #'+this.reqSequence),this.uuid);}
+			await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'continuing to next job, #'+next+' afer doing #'+this.reqSequence, doLog);
 			// async start qued job
 			let doNext = async function(pPurpose:string, pNext:string){
 				let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[pPurpose][pNext];
@@ -273,7 +278,7 @@ class SequencedStartWaitingJob{
 		
 		// let the thread continue that was waiting for the job to be done
 		this.resolve(jobValue);
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,this.uuid,'SequencedStartLock',this.purpose,'job/thread released #'+this.reqSequence),this.uuid);}
+		await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'job/thread released #'+this.reqSequence, doLog);
 	}
 }
 
@@ -283,7 +288,7 @@ let throttleLastDone:GTS.DM.HashTable<number> = {};
 // Que jobs doing each on in turn in the order they arrive, with a delay between jobs
 export async function throttle<T>(uuid:string, purpose:string, delay:number, action:Function, doLog?:boolean):Promise<T>{
 	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'new job/thread arrives'),uuid);}
+	await addThreadingLog(uuid,'Throttle',purpose,'new job/thread arrives', doLog);
 	// find out if there is currently a job being processed as this one arrives to be done
 	if(!throttleWaiting[purpose]){throttleWaiting[purpose]=[];}
 	let jobProcessing:boolean = throttleStatus[purpose]?throttleStatus[purpose]:false;
@@ -292,7 +297,7 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 	// if there is a job being processed
 	if(jobProcessing){
 		let existingJobCount:number = throttleWaiting[purpose].length;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'job already being processed, '+existingJobCount+' jobs in the que'),uuid);}
+		await addThreadingLog(uuid,'Throttle',purpose,'job already being processed, '+existingJobCount+' jobs in the que', doLog);
 		// return a promise that the job will be done when it can be
 		return new Promise(async function(resolve, reject){
 			// que this job to be done when possible
@@ -302,36 +307,36 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 				//console.log(`For throttle now is ${ticks}, last done at ${throttleLastDone[purpose]}`);
 				let delayDone:number = ticks-throttleLastDone[purpose];
 				if(delayDone < delay){
-					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,`enforced delay of ${delay-delayDone}`),uuid);}
+					await addThreadingLog(uuid,'Throttle',purpose,`enforced delay of ${delay-delayDone}`, doLog);
 					//console.log(`Throttle delaying ${delay-delayDone}`);
 					await pause(delay-delayDone);
 					//console.log('Throttle delay done');
 				}
 				//console.log('qued job being processed');
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'qued job being processed'),uuid);}
+				await addThreadingLog(uuid,'Throttle',purpose,'qued job being processed', doLog);
 				// do this job when the time comes
 				let jobValue:T = await action(uuid);
 				// record when job is done
 				throttleLastDone[purpose] = new Date().getTime();
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'qued job done'),uuid);}
+				await addThreadingLog(uuid,'Throttle',purpose,'qued job done', doLog);
 				//console.log('job done');
 				// try and process next job in the que
 				let r = throttleWaiting[purpose].shift();
 				if(r){
 					// and when it is done process the next job in the que if any
 					let existingJobCount:number = throttleWaiting[purpose].length;
-					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'got another qued job, '+existingJobCount+' more in que'),uuid);}
+					await addThreadingLog(uuid,'Throttle',purpose,'got another qued job, '+existingJobCount+' more in que', doLog);
 					r.process(r.uuid,r.action,r.resolve);
 				}else{
 					// flag that processing is finished if we have just done the last job in the que
 					jobProcessing = throttleStatus[purpose] = false;
-					if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'que finished'),uuid);}
+					await addThreadingLog(uuid,'Throttle',purpose,'que finished', doLog);
 				}
 				// let the thread continue that was waiting for the job to be done
 				resolve(jobValue);
-				if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'job/thread released'),uuid);}
+				await addThreadingLog(uuid,'Throttle',purpose,'job/thread released', doLog);
 			}});
-			if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'job qued'),uuid);}
+			await addThreadingLog(uuid,'Throttle',purpose,'job qued', doLog);
 		});
 	}
 	// start the job if there are no others to wait for
@@ -341,33 +346,33 @@ export async function throttle<T>(uuid:string, purpose:string, delay:number, act
 	//console.log(`For throttle first now is ${ticksFirst}, last done at ${throttleLastDone[purpose]}`);
 	let delayDoneFirst:number = ticksFirst-throttleLastDone[purpose];
 	if(delayDoneFirst < delay){
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,`enforced delay of ${delay-delayDoneFirst}`),uuid);}
+		await addThreadingLog(uuid,'Throttle',purpose,`enforced delay of ${delay-delayDoneFirst}`, doLog);
 		//console.log(`Throttle delaying ${delay-delayDoneFirst}`);
 		await pause(delay-delayDoneFirst);
 		//console.log('Throttle delay done');
 	}
 	//console.log('start processing job');
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'start processing job'),uuid);}
+	await addThreadingLog(uuid,'Throttle',purpose,'start processing job', doLog);
 	// do the job
 	let jobValueFirst:T = await action(uuid);
 	// record when job is done
 	throttleLastDone[purpose] = new Date().getTime();
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'job done'),uuid);}
+	await addThreadingLog(uuid,'Throttle',purpose,'job done', doLog);
 	//console.log('job done');
 	// try and process any job in the que
 	let r = throttleWaiting[purpose].shift();
 	if(r){
 		// and when it is done process a job in the que if any
 		let existingJobCount:number = throttleWaiting[purpose].length;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'got a qued job, '+existingJobCount+' more in que'),uuid);}
+		await addThreadingLog(uuid,'Throttle',purpose,'got a qued job, '+existingJobCount+' more in que', doLog);
 		r.process(r.uuid,r.action,r.resolve);
 	}else{
 		// flag that processing is finished if there is no que
 		jobProcessing = throttleStatus[purpose] = false;
-		if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'que not used'),uuid);}
+		await addThreadingLog(uuid,'Throttle',purpose,'que not used', doLog);
 	}
 	// let the thread continue that called to have the job done
-	if(doLog){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,uuid,'Throttle',purpose,'job released'),uuid);}
+	await addThreadingLog(uuid,'Throttle',purpose,'job released', doLog);
 	//console.log(`${uuid} ${purpose} job released`);
 	return jobValueFirst;
 }
