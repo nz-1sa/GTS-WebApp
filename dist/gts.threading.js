@@ -32,14 +32,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.sequencedStartLock = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.delayCancellable = exports.CancellableDelay = exports.pause = void 0;
+exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.SequencedJob = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.CancellableDelay = exports.pause = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
 const doLogging = false; // if thread debug logging is being recorded
 let threadingLogId = 0; // incrementing ids for sequencing of log entries
 const threadingLogGroup = new Date().getTime(); // single server, the id is in groups of when the file loaded
-// shorthand to add log if logging is enabled
+// shorthand to add log to DB if logging is enabled
 function addThreadingLog(pUuid, pType, pPurpose, pAction, doLog) {
     return __awaiter(this, void 0, void 0, function* () {
         if (doLog === undefined) {
@@ -55,32 +55,31 @@ function pause(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 exports.pause = pause;
-// holds a promise to wait for, and the ability to cancel the delay the promise is waiting for
+// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
 class CancellableDelay {
     constructor(pTimeout, pPromise) {
         this.timeout = pTimeout;
         this.promise = pPromise;
     }
+    // start waiting for a pause that can be cancelled
+    static startCancellableDelay(ms) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // ability to cancel the timeout, init to a dummy value to allow code to compile
+            var delayTimeout = setTimeout(() => null, 1);
+            // the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
+            var delayPromise = Promise.resolve();
+            // set the real values for delayTimeout and delayPromise
+            var promiseTimeoutSet = new Promise(function (resolveTimeoutSet, rejectTimeoutSet) {
+                delayPromise = new Promise(function (resolve, reject) { delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet(); });
+            });
+            // wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
+            yield promiseTimeoutSet;
+            // return the results
+            return new CancellableDelay(delayTimeout, delayPromise);
+        });
+    }
 }
 exports.CancellableDelay = CancellableDelay;
-// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
-function delayCancellable(ms) {
-    return __awaiter(this, void 0, void 0, function* () {
-        // ability to cancel the timeout, init to a dummy value to allow code to compile
-        var delayTimeout = setTimeout(() => null, 1);
-        // the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
-        var delayPromise = Promise.resolve();
-        // set the real values for delayTimeout and delayPromise
-        var promiseTimeoutSet = new Promise(function (resolveTimeoutSet, rejectTimeoutSet) {
-            delayPromise = new Promise(function (resolve, reject) { delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet(); });
-        });
-        // wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
-        yield promiseTimeoutSet;
-        // return the results
-        return new CancellableDelay(delayTimeout, delayPromise);
-    });
-}
-exports.delayCancellable = delayCancellable;
 let doOnceStatus = {};
 let doOnceWaiting = {};
 function multiThreadDoOnce(purpose, uuid, action) {
@@ -107,7 +106,7 @@ function multiThreadDoOnce(purpose, uuid, action) {
             return new Promise(function (resolve, reject) { resolve(jobValue); });
         }
         if (jobStatus < 100) { // que additional requests that arrive while the job is being done
-            doOnceStatus[purpose] = --jobStatus; // keep tracing value low, while waiting for the job to be done
+            doOnceStatus[purpose] = --jobStatus; // keep tracking value low, while waiting for the job to be done
             return new Promise(function (resolve, reject) {
                 return __awaiter(this, void 0, void 0, function* () {
                     yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'Pausing thread while waiting for job');
@@ -232,7 +231,7 @@ function singleLock(purpose, uuid, action, doLog) {
         else {
             // flag that processing is finished if there is no que
             jobProcessing = singleLockStatus[purpose] = false;
-            yield addThreadingLog(uuid, 'SingleLock', purpose, 'que not used');
+            yield addThreadingLog(uuid, 'SingleLock', purpose, 'que not used', doLog);
         }
         // let the thread continue that called to have the job done
         yield addThreadingLog(uuid, 'SingleLock', purpose, 'job released', doLog);
@@ -241,55 +240,8 @@ function singleLock(purpose, uuid, action, doLog) {
     });
 }
 exports.singleLock = singleLock;
-let sequencedStartJobsWaiting = {};
-function sequencedStartLock(uuid, purpose, reqSequence, expectedSequence, seqCheck, action, doLog) {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (doLog === undefined) {
-            doLog = doLogging;
-        } // if no param is given to do logging, use the default
-        if (!sequencedStartJobsWaiting[purpose]) {
-            sequencedStartJobsWaiting[purpose] = {};
-        } // ensure storage defined for purpose
-        // just do the request if it is in the correct order
-        if (reqSequence == expectedSequence) {
-            yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for expected sequence #' + reqSequence, doLog);
-            // remove store if previous request was qued for the sequence we are processing now
-            let cur = reqSequence.toString();
-            if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
-                delete sequencedStartJobsWaiting[purpose][cur];
-                yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'deleted prequed job for #' + reqSequence + ' as a new request arrived at the expected sequence');
-            }
-            return new Promise(function (resolve, reject) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    let curJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
-                    curJob.process(doLog);
-                });
-            });
-        }
-        if (reqSequence < expectedSequence) {
-            yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for already started, expected ' + expectedSequence + ' and got sequence #' + reqSequence);
-            return Promise.reject('incorrect sequence');
-        }
-        if (reqSequence < (expectedSequence + 11)) {
-            let key = reqSequence.toString();
-            yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'will que future job #' + reqSequence + ' as are almost there from ' + expectedSequence, doLog);
-            // return a promise that the job will be done on its turn
-            return new Promise(function (resolve, reject) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    let quedJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
-                    sequencedStartJobsWaiting[purpose][key] = quedJob;
-                    yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job qued #' + reqSequence, doLog);
-                });
-            });
-        }
-        else {
-            yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for too far in the future, wanted ' + expectedSequence + ' and got sequence #' + reqSequence, doLog);
-            return Promise.reject('incorrect sequence');
-        }
-    });
-}
-exports.sequencedStartLock = sequencedStartLock;
-class SequencedStartWaitingJob {
+// jobs that start in sequence
+class SequencedJob {
     constructor(pUuid, pPurpose, pReqSequence, pSeqCheck, pAction, pResolve, pReject) {
         this.uuid = pUuid;
         this.purpose = pPurpose;
@@ -299,10 +251,56 @@ class SequencedStartWaitingJob {
         this.resolve = pResolve;
         this.reject = pReject;
     }
-    process(doLog) {
+    static attemptSequencedJob(uuid, purpose, reqSequence, expectedSequence, seqCheck, action, doLog) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (doLog === undefined) {
+                doLog = doLogging;
+            } // if no param is given to do logging, use the default
+            if (!SequencedJob.jobsWaiting[purpose]) {
+                SequencedJob.jobsWaiting[purpose] = {};
+            } // ensure storage defined for purpose
+            // just do the request if it is in the correct order
+            if (reqSequence == expectedSequence) {
+                yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for expected sequence #' + reqSequence, doLog);
+                // remove store if previous request was qued for the sequence we are processing now
+                let cur = reqSequence.toString();
+                if (SequencedJob.jobsWaiting[purpose].hasOwnProperty(cur)) {
+                    delete SequencedJob.jobsWaiting[purpose][cur];
+                    yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'deleted prequed job for #' + reqSequence + ' as a new request arrived at the expected sequence');
+                }
+                return new Promise(function (resolve, reject) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        let curJob = new SequencedJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
+                        curJob.processSequencedJob(doLog);
+                    });
+                });
+            }
+            if (reqSequence < expectedSequence) {
+                yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for already started, expected ' + expectedSequence + ' and got sequence #' + reqSequence);
+                return Promise.reject('incorrect sequence');
+            }
+            if (reqSequence < (expectedSequence + 11)) {
+                let key = reqSequence.toString();
+                yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'will que future job #' + reqSequence + ' as are almost there from ' + expectedSequence, doLog);
+                // return a promise that the job will be done on its turn
+                return new Promise(function (resolve, reject) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        let quedJob = new SequencedJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject);
+                        SequencedJob.jobsWaiting[purpose][key] = quedJob;
+                        yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job qued #' + reqSequence, doLog);
+                    });
+                });
+            }
+            else {
+                yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for too far in the future, wanted ' + expectedSequence + ' and got sequence #' + reqSequence, doLog);
+                return Promise.reject('incorrect sequence');
+            }
+        });
+    }
+    processSequencedJob(doLog) {
         return __awaiter(this, void 0, void 0, function* () {
             //TODO: test decryption is legit  before sequence test/increment
-            let res = yield this.seqCheck(this.uuid, this.purpose, this.reqSequence); // DB.actionSequence
+            let res = yield this.seqCheck(this.uuid, this.purpose, this.reqSequence);
             console.log('double check is');
             console.log(res);
             if (res.error) {
@@ -321,13 +319,13 @@ class SequencedStartWaitingJob {
             yield addThreadingLog(this.uuid, 'SequencedStartLock', this.purpose, 'finished job #' + this.reqSequence, doLog);
             // Check if there is a next job waiting
             let next = (this.reqSequence + 1).toString();
-            if (sequencedStartJobsWaiting[this.purpose].hasOwnProperty(next)) {
+            if (SequencedJob.jobsWaiting[this.purpose].hasOwnProperty(next)) {
                 yield addThreadingLog(this.uuid, 'SequencedStartLock', this.purpose, 'continuing to next job, #' + next + ' afer doing #' + this.reqSequence, doLog);
                 // async start qued job
                 let doNext = function (pPurpose, pNext) {
                     return __awaiter(this, void 0, void 0, function* () {
-                        let nextJob = sequencedStartJobsWaiting[pPurpose][pNext];
-                        nextJob.process(doLog);
+                        let nextJob = SequencedJob.jobsWaiting[pPurpose][pNext];
+                        nextJob.processSequencedJob(doLog);
                     });
                 };
                 doNext(this.purpose, next);
@@ -338,15 +336,14 @@ class SequencedStartWaitingJob {
         });
     }
 }
+exports.SequencedJob = SequencedJob;
+SequencedJob.jobsWaiting = {};
 let throttleStatus = {};
 let throttleWaiting = {};
 let throttleLastDone = {};
 // Que jobs doing each on in turn in the order they arrive, with a delay between jobs
 function throttle(uuid, purpose, delay, action, doLog) {
     return __awaiter(this, void 0, void 0, function* () {
-        if (doLog === undefined) {
-            doLog = doLogging;
-        } // if no param is given to do logging, use the default
         yield addThreadingLog(uuid, 'Throttle', purpose, 'new job/thread arrives', doLog);
         // find out if there is currently a job being processed as this one arrives to be done
         if (!throttleWaiting[purpose]) {
@@ -463,7 +460,7 @@ function doWithTimeout(uuid, timeout, action) {
         return p;
         function limitTime(uuid, timeout) {
             return __awaiter(this, void 0, void 0, function* () {
-                let delay = yield delayCancellable(timeout);
+                let delay = yield CancellableDelay.startCancellableDelay(timeout);
                 ourTimeout = delay.timeout;
                 yield delay.promise;
                 if (!funcOver) {

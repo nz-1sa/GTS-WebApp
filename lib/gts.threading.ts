@@ -7,20 +7,18 @@ const doLogging:boolean = false;												// if thread debug logging is being 
 let threadingLogId:number = 0;													// incrementing ids for sequencing of log entries
 const threadingLogGroup:number = new Date().getTime();		// single server, the id is in groups of when the file loaded
 
-// shorthand to add log if logging is enabled
+// shorthand to add log to DB if logging is enabled
 async function addThreadingLog( pUuid:string, pType:string, pPurpose:string, pAction:string, doLog?:boolean){
 	if(doLog===undefined){ doLog = doLogging; }
 	if(doLog!){await DB.addThreadingLog(new ThreadingLog().setNew(++threadingLogId,threadingLogGroup,pUuid,pType,pPurpose,pAction),pUuid);}
 }
-
-
 
 // introduce a delay in code by allowing await for a setTimeout
 export function pause(ms:number):Promise<void>{
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// holds a promise to wait for, and the ability to cancel the delay the promise is waiting for
+// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
 export class CancellableDelay{
 	timeout:NodeJS.Timeout;	// the timeout from a setTimeout (clear to cancel)
 	promise:Promise<void>;	// the promise that is resolved the the setTimout finishes
@@ -28,22 +26,31 @@ export class CancellableDelay{
 		this.timeout = pTimeout;
 		this.promise = pPromise;
 	}
+	
+	// start waiting for a pause that can be cancelled
+	public static async startCancellableDelay(ms:number):Promise<CancellableDelay>{
+		// ability to cancel the timeout, init to a dummy value to allow code to compile
+		var delayTimeout:NodeJS.Timeout = setTimeout(()=>null,1);
+		// the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
+		var delayPromise:Promise<void> = Promise.resolve();
+		// set the real values for delayTimeout and delayPromise
+		var promiseTimeoutSet:Promise<void> = new Promise(function(resolveTimeoutSet:Function, rejectTimeoutSet:Function){
+			delayPromise = new Promise(function(resolve, reject){delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet();});
+		});
+		// wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
+		await promiseTimeoutSet;
+		// return the results
+		return new CancellableDelay(delayTimeout, delayPromise);	
+	}
 }
 
-// use setTimeout to introduce a delay in code that can be cancelled by using clearTimeout
-export async function delayCancellable(ms:number):Promise<CancellableDelay>{
-	// ability to cancel the timeout, init to a dummy value to allow code to compile
-	var delayTimeout:NodeJS.Timeout = setTimeout(()=>null,1);
-	// the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
-	var delayPromise:Promise<void> = Promise.resolve();
-	// set the real values for delayTimeout and delayPromise
-	var promiseTimeoutSet:Promise<void> = new Promise(function(resolveTimeoutSet:Function, rejectTimeoutSet:Function){
-		delayPromise = new Promise(function(resolve, reject){delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet();});
-	});
-	// wait for the real values to be set to return, avoids race condition by ensuring the function in the promise constructor finishes before exiting function delayCancellable
-	await promiseTimeoutSet;
-	// return the results
-	return new CancellableDelay(delayTimeout, delayPromise);	
+class DoOnceWaitingJob{
+	uuid: string;
+	resolve: Function;
+	constructor( pUuid:string, pAction:Function, pResolve:Function, pProcess:Function ){
+		this.uuid = pUuid;
+		this.resolve = pResolve;
+	}
 }
 
 let doOnceStatus:GTS.DM.HashTable<number> = {};
@@ -69,7 +76,7 @@ export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:F
 		return new Promise(function(resolve, reject){resolve(jobValue)});
 	}
 	if(jobStatus < 100){// que additional requests that arrive while the job is being done
-		doOnceStatus[purpose] = --jobStatus;		// keep tracing value low, while waiting for the job to be done
+		doOnceStatus[purpose] = --jobStatus;		// keep tracking value low, while waiting for the job to be done
 		return new Promise(async function(resolve, reject){
 			await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'Pausing thread while waiting for job');
 			doOnceWaiting[purpose].push({uuid:uuid,resolve:resolve});
@@ -112,6 +119,20 @@ export async function doAllAsync( jobs:Function[] , uuid:string, purpose:string)
 			promiseAllResolve();
 		}
 		await addThreadingLog(uuid,'doAllAsync',purpose,`finished job ${i}`);
+	}
+}
+
+class SingleLockWaitingJob{
+	uuid: string;
+	action: Function;
+	resolve: Function;
+	process: Function;
+	
+	constructor( pUuid:string, pAction:Function, pResolve:Function, pProcess:Function ){
+		this.uuid = pUuid;
+		this.action = pAction;
+		this.resolve = pResolve;
+		this.process = pProcess;
 	}
 }
 
@@ -187,52 +208,16 @@ export async function singleLock<T>(purpose:string, uuid:string, action:Function
 	return jobValueFirst;
 }
 
-let sequencedStartJobsWaiting:GTS.DM.HashTable<GTS.DM.HashTable<SequencedStartWaitingJob>> = {};
-export async function sequencedStartLock<T>(uuid:string, purpose:string, reqSequence:number, expectedSequence:number, seqCheck:Function, action:Function, doLog?:boolean):Promise<T>{
-	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
-	if(!sequencedStartJobsWaiting[purpose]){sequencedStartJobsWaiting[purpose]={};}	// ensure storage defined for purpose
-	// just do the request if it is in the correct order
-	if(reqSequence==expectedSequence){
-		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for expected sequence #'+reqSequence, doLog);
-		// remove store if previous request was qued for the sequence we are processing now
-		let cur:string = reqSequence.toString();
-		if (sequencedStartJobsWaiting[purpose].hasOwnProperty(cur)) {
-			delete sequencedStartJobsWaiting[purpose][cur];
-			await addThreadingLog(uuid,'SequencedStartLock',purpose,'deleted prequed job for #'+reqSequence+' as a new request arrived at the expected sequence');
-		}
-		return new Promise(async function(resolve, reject){
-			let curJob:SequencedStartWaitingJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
-			curJob.process(doLog!);
-		});
-	}
-	if(reqSequence < expectedSequence){
-		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for already started, expected '+expectedSequence+' and got sequence #'+reqSequence);
-		return Promise.reject('incorrect sequence');
-	}
-	if(reqSequence < (expectedSequence+11)){
-		let key = reqSequence.toString();
-		await addThreadingLog(uuid,'SequencedStartLock',purpose,'will que future job #'+reqSequence+' as are almost there from '+expectedSequence, doLog);
-			
-		// return a promise that the job will be done on its turn
-		return new Promise(async function(resolve, reject){
-			let quedJob:SequencedStartWaitingJob = new SequencedStartWaitingJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
-			sequencedStartJobsWaiting[purpose][key] = quedJob;
-			await addThreadingLog(uuid,'SequencedStartLock',purpose,'job qued #'+reqSequence, doLog);
-		});
-	} else {
-		await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for too far in the future, wanted '+expectedSequence+' and got sequence #'+reqSequence, doLog);
-		return Promise.reject('incorrect sequence');
-	}
-}
-
-class SequencedStartWaitingJob{
-	uuid: string;
-	purpose: string;
-	reqSequence: number;
-	seqCheck: Function;
-	action: Function;
-	resolve: Function;
-	reject: Function;
+// jobs that start in sequence
+export class SequencedJob{
+	private uuid: string;
+	private purpose: string;
+	private reqSequence: number;
+	private seqCheck: Function;
+	private action: Function;
+	private resolve: Function;
+	private reject: Function;
+	private static jobsWaiting: GTS.DM.HashTable<GTS.DM.HashTable<SequencedJob>> = {};
 	
 	constructor( pUuid:string, pPurpose:string, pReqSequence:number, pSeqCheck:Function, pAction:Function, pResolve:Function, pReject:Function ){
 		this.uuid = pUuid;
@@ -244,9 +229,46 @@ class SequencedStartWaitingJob{
 		this.reject = pReject;
 	}
 	
-	async process<T>(doLog:boolean): Promise<void>{
+	public static async attemptSequencedJob<T>(uuid:string, purpose:string, reqSequence:number, expectedSequence:number, seqCheck:Function, action:Function, doLog?:boolean):Promise<T>{
+		if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
+		if(!SequencedJob.jobsWaiting[purpose]){SequencedJob.jobsWaiting[purpose]={};}	// ensure storage defined for purpose
+		// just do the request if it is in the correct order
+		if(reqSequence==expectedSequence){
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for expected sequence #'+reqSequence, doLog);
+			// remove store if previous request was qued for the sequence we are processing now
+			let cur:string = reqSequence.toString();
+			if (SequencedJob.jobsWaiting[purpose].hasOwnProperty(cur)) {
+				delete SequencedJob.jobsWaiting[purpose][cur];
+				await addThreadingLog(uuid,'SequencedStartLock',purpose,'deleted prequed job for #'+reqSequence+' as a new request arrived at the expected sequence');
+			}
+			return new Promise(async function(resolve, reject){
+				let curJob:SequencedJob = new SequencedJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
+				curJob.processSequencedJob(doLog!);
+			});
+		}
+		if(reqSequence < expectedSequence){
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for already started, expected '+expectedSequence+' and got sequence #'+reqSequence);
+			return Promise.reject('incorrect sequence');
+		}
+		if(reqSequence < (expectedSequence+11)){
+			let key = reqSequence.toString();
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'will que future job #'+reqSequence+' as are almost there from '+expectedSequence, doLog);
+				
+			// return a promise that the job will be done on its turn
+			return new Promise(async function(resolve, reject){
+				let quedJob:SequencedJob = new SequencedJob(uuid, purpose, reqSequence, seqCheck, action, resolve, reject );
+				SequencedJob.jobsWaiting[purpose][key] = quedJob;
+				await addThreadingLog(uuid,'SequencedStartLock',purpose,'job qued #'+reqSequence, doLog);
+			});
+		} else {
+			await addThreadingLog(uuid,'SequencedStartLock',purpose,'job arrived for too far in the future, wanted '+expectedSequence+' and got sequence #'+reqSequence, doLog);
+			return Promise.reject('incorrect sequence');
+		}
+	}
+	
+	async processSequencedJob<T>(doLog:boolean): Promise<void>{
 		//TODO: test decryption is legit  before sequence test/increment
-		let res:GTS.DM.WrappedResult<boolean> = await this.seqCheck(this.uuid, this.purpose, this.reqSequence); // DB.actionSequence
+		let res:GTS.DM.WrappedResult<boolean> = await this.seqCheck(this.uuid, this.purpose, this.reqSequence);
 		console.log('double check is');
 		console.log(res);
 		if(res.error){
@@ -266,12 +288,12 @@ class SequencedStartWaitingJob{
 		
 		// Check if there is a next job waiting
 		let next:string = (this.reqSequence+1).toString();
-		if (sequencedStartJobsWaiting[this.purpose].hasOwnProperty(next)) {
+		if (SequencedJob.jobsWaiting[this.purpose].hasOwnProperty(next)) {
 			await addThreadingLog(this.uuid,'SequencedStartLock',this.purpose,'continuing to next job, #'+next+' afer doing #'+this.reqSequence, doLog);
 			// async start qued job
 			let doNext = async function(pPurpose:string, pNext:string){
-				let nextJob:SequencedStartWaitingJob = sequencedStartJobsWaiting[pPurpose][pNext];
-				nextJob.process(doLog);
+				let nextJob:SequencedJob = SequencedJob.jobsWaiting[pPurpose][pNext];
+				nextJob.processSequencedJob(doLog);
 			};
 			doNext(this.purpose, next);
 		}
@@ -287,12 +309,10 @@ let throttleWaiting:GTS.DM.HashTable<SingleLockWaitingJob[]> = {};
 let throttleLastDone:GTS.DM.HashTable<number> = {};
 // Que jobs doing each on in turn in the order they arrive, with a delay between jobs
 export async function throttle<T>(uuid:string, purpose:string, delay:number, action:Function, doLog?:boolean):Promise<T>{
-	if(doLog===undefined){ doLog = doLogging; }	// if no param is given to do logging, use the default
 	await addThreadingLog(uuid,'Throttle',purpose,'new job/thread arrives', doLog);
 	// find out if there is currently a job being processed as this one arrives to be done
 	if(!throttleWaiting[purpose]){throttleWaiting[purpose]=[];}
-	let jobProcessing:boolean = throttleStatus[purpose]?throttleStatus[purpose]:false;
-	throttleStatus[purpose] = jobProcessing;
+	let jobProcessing:boolean = throttleStatus[purpose]?throttleStatus[purpose]:false; throttleStatus[purpose] = jobProcessing;
 	if(!throttleLastDone[purpose]){throttleLastDone[purpose]=0;}
 	// if there is a job being processed
 	if(jobProcessing){
@@ -392,7 +412,7 @@ export async function doWithTimeout<T>(uuid:string, timeout:number, action:Funct
 	return p;
 	
 	async function limitTime(uuid:string, timeout:number){
-		let delay:CancellableDelay = await delayCancellable(timeout);
+		let delay:CancellableDelay = await CancellableDelay.startCancellableDelay(timeout);
 		ourTimeout = delay.timeout;
 		await delay.promise;
 		if(!funcOver){
@@ -474,29 +494,6 @@ export function attachThreadingDebugInterface(web:WS.WebServerHelper, webapp:Exp
 			return new WS.WebResponse(false,'Error running DoAllAsync test\r\n'+err,'Error running DoAllAsync test','');
 		}
 	});
-}
-
-class SingleLockWaitingJob{
-	uuid: string;
-	action: Function;
-	resolve: Function;
-	process: Function;
-	
-	constructor( pUuid:string, pAction:Function, pResolve:Function, pProcess:Function ){
-		this.uuid = pUuid;
-		this.action = pAction;
-		this.resolve = pResolve;
-		this.process = pProcess;
-	}
-}
-
-class DoOnceWaitingJob{
-	uuid: string;
-	resolve: Function;
-	constructor( pUuid:string, pAction:Function, pResolve:Function, pProcess:Function ){
-		this.uuid = pUuid;
-		this.resolve = pResolve;
-	}
 }
 
 // Multi-threading logic is logged. This may help future debugging

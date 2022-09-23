@@ -7,12 +7,24 @@ export declare class CancellableDelay {
     timeout: NodeJS.Timeout;
     promise: Promise<void>;
     constructor(pTimeout: NodeJS.Timeout, pPromise: Promise<void>);
+    static startCancellableDelay(ms: number): Promise<CancellableDelay>;
 }
-export declare function delayCancellable(ms: number): Promise<CancellableDelay>;
 export declare function multiThreadDoOnce<T>(purpose: string, uuid: string, action: Function): Promise<T>;
 export declare function doAllAsync(jobs: Function[], uuid: string, purpose: string): Promise<void>;
 export declare function singleLock<T>(purpose: string, uuid: string, action: Function, doLog?: boolean): Promise<T>;
-export declare function sequencedStartLock<T>(uuid: string, purpose: string, reqSequence: number, expectedSequence: number, seqCheck: Function, action: Function, doLog?: boolean): Promise<T>;
+export declare class SequencedJob {
+    private uuid;
+    private purpose;
+    private reqSequence;
+    private seqCheck;
+    private action;
+    private resolve;
+    private reject;
+    private static jobsWaiting;
+    constructor(pUuid: string, pPurpose: string, pReqSequence: number, pSeqCheck: Function, pAction: Function, pResolve: Function, pReject: Function);
+    static attemptSequencedJob<T>(uuid: string, purpose: string, reqSequence: number, expectedSequence: number, seqCheck: Function, action: Function, doLog?: boolean): Promise<T>;
+    processSequencedJob<T>(doLog: boolean): Promise<void>;
+}
 export declare function throttle<T>(uuid: string, purpose: string, delay: number, action: Function, doLog?: boolean): Promise<T>;
 export declare function doWithTimeout<T>(uuid: string, timeout: number, action: Function): Promise<[T, boolean]>;
 export declare function attachThreadingDebugInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
