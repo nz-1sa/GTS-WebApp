@@ -9,7 +9,7 @@ export declare class CancellableDelay {
     constructor(pTimeout: NodeJS.Timeout, pPromise: Promise<void>);
     static startCancellableDelay(ms: number): Promise<CancellableDelay>;
 }
-export declare function multiThreadDoOnce<T>(purpose: string, uuid: string, action: Function): Promise<T>;
+export declare function doFuncOrTimeout<T>(uuid: string, timeout: number, action: Function): Promise<[T, boolean]>;
 export declare function doAllAsync(jobs: Function[], uuid: string, purpose: string): Promise<void>;
 export declare function singleLock<T>(purpose: string, uuid: string, action: Function, doLog?: boolean): Promise<T>;
 export declare class SequencedJob {
@@ -26,7 +26,6 @@ export declare class SequencedJob {
     processSequencedJob<T>(doLog: boolean): Promise<void>;
 }
 export declare function throttle<T>(uuid: string, purpose: string, delay: number, action: Function, doLog?: boolean): Promise<T>;
-export declare function doWithTimeout<T>(uuid: string, timeout: number, action: Function): Promise<[T, boolean]>;
 export declare function attachThreadingDebugInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
 export declare class ThreadingLog {
     dbId: number;

@@ -204,7 +204,7 @@ export class WebServerHelper{
 			}
 			// get the response for the request
 			let timedOut = false;
-			[response,timedOut] = await Threading.doWithTimeout<WebResponse>(uuid, 90000, async function(uuid:string){return await work(uuid, req.ip, req.cookies, ...paramVals);});
+			[response,timedOut] = await Threading.doFuncOrTimeout<WebResponse>(uuid, 90000, async function(uuid:string){return await work(uuid, req.ip, req.cookies, ...paramVals);});
 			
 			if(timedOut){
 				response = new WebResponse(false, 'ERROR: Processing request timed out', `Error, Processing request timed out while handling ${requestUrl}`,'');

@@ -238,7 +238,7 @@ class WebServerHelper {
                 }
                 // get the response for the request
                 let timedOut = false;
-                [response, timedOut] = yield Threading.doWithTimeout(uuid, 90000, function (uuid) {
+                [response, timedOut] = yield Threading.doFuncOrTimeout(uuid, 90000, function (uuid) {
                     return __awaiter(this, void 0, void 0, function* () { return yield work(uuid, req.ip, req.cookies, ...paramVals); });
                 });
                 if (timedOut) {

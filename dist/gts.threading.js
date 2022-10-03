@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.doWithTimeout = exports.throttle = exports.SequencedJob = exports.singleLock = exports.doAllAsync = exports.multiThreadDoOnce = exports.CancellableDelay = exports.pause = void 0;
+exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.throttle = exports.SequencedJob = exports.singleLock = exports.doAllAsync = exports.doFuncOrTimeout = exports.CancellableDelay = exports.pause = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
@@ -80,49 +80,161 @@ class CancellableDelay {
     }
 }
 exports.CancellableDelay = CancellableDelay;
-let doOnceStatus = {};
-let doOnceWaiting = {};
-function multiThreadDoOnce(purpose, uuid, action) {
+function doFuncOrTimeout(uuid, timeout, action) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'entered function');
-        let jobStatus = doOnceStatus[purpose] ? doOnceStatus[purpose] : 0;
-        doOnceStatus[purpose] = ++jobStatus;
-        if (!doOnceWaiting[purpose]) {
-            doOnceWaiting[purpose] = [];
-        }
-        var jobValue;
-        if (jobStatus == 1) { // first in, do the job
-            yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'starting job');
-            jobValue = yield action(uuid);
-            yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'finished job');
-            doOnceStatus[purpose] = jobStatus = 100; // flag the job has been done, no more threads will be added now to waiting to resolve
-            // release any threads waiting on the completion of the job
-            let waitingToResolve = doOnceWaiting[purpose];
-            for (var i = 0; i < waitingToResolve.length; i++) {
-                waitingToResolve[i].resolve(jobValue); // let any and all waiting in the que proceed now the job is done
-                yield addThreadingLog(waitingToResolve[i].uuid, 'multiThreadDoOnce', purpose, 'resumed thread waiting for job');
-            }
-            waitingToResolve = doOnceWaiting[purpose] = []; // clear list now they are all resolved
-            return new Promise(function (resolve, reject) { resolve(jobValue); });
-        }
-        if (jobStatus < 100) { // que additional requests that arrive while the job is being done
-            doOnceStatus[purpose] = --jobStatus; // keep tracking value low, while waiting for the job to be done
-            return new Promise(function (resolve, reject) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'Pausing thread while waiting for job');
-                    doOnceWaiting[purpose].push({ uuid: uuid, resolve: resolve });
-                });
+        let funcOver = false;
+        var ourTimeout; // ability to cancel time limit if work is done first
+        var promiseDoneOrTimedout; // how we will resolve this promise
+        let p = new Promise(function (resolve, reject) {
+            promiseDoneOrTimedout = resolve;
+        });
+        yield addThreadingLog(uuid, 'doFuncOrTimeout', '', 'starting job with timeout');
+        limitTime(uuid, timeout);
+        doJob(uuid, action);
+        return p;
+        function limitTime(uuid, timeout) {
+            return __awaiter(this, void 0, void 0, function* () {
+                let delay = yield CancellableDelay.startCancellableDelay(timeout);
+                ourTimeout = delay.timeout;
+                yield delay.promise;
+                if (!funcOver) {
+                    funcOver = true;
+                    yield addThreadingLog(uuid, 'doFuncOrTimeout', '', 'the job timed out');
+                    promiseDoneOrTimedout([null, true]); // resolves the promise returned by doFuncOrTimeout. Null result, true for timeout
+                    return;
+                }
+                yield addThreadingLog(uuid, 'doFuncOrTimeout', '', 'timeout finished after doJob');
             });
         }
-        if (jobStatus == 200) { // reset tracking to prevent too large a number being used
-            doOnceStatus[purpose] = jobStatus = 100; // numbers 100 and above show the job has been done
+        function doJob(uuid, action) {
+            return __awaiter(this, void 0, void 0, function* () {
+                let res = yield action(uuid);
+                if (!funcOver) {
+                    funcOver = true;
+                    yield addThreadingLog(uuid, 'doFuncOrTimeout', '', 'doJob finished before timeout');
+                    clearTimeout(ourTimeout);
+                    promiseDoneOrTimedout([res, false]); // resolves promise with the result of the action, false for not timeout
+                    return;
+                }
+                yield addThreadingLog(uuid, 'doFuncOrTimeout', '', 'doJob finished after timeout');
+            });
         }
-        // nothing to do as it was already done once
-        yield addThreadingLog(uuid, 'multiThreadDoOnce', purpose, 'job was already completed');
-        return new Promise(function (resolve, reject) { resolve(jobValue); });
     });
 }
-exports.multiThreadDoOnce = multiThreadDoOnce;
+exports.doFuncOrTimeout = doFuncOrTimeout;
+class DoOnceJob {
+    constructor(pUuid, pResolve) {
+        this.uuid = pUuid;
+        this.resolve = pResolve;
+    }
+    static executeOnce(pUuid, purpose, action, cacheDuration) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'entered function');
+            if (!DoOnceJob.currentReqeusts[purpose]) {
+                DoOnceJob.currentReqeusts[purpose] = [];
+            }
+            ; // ensure storage of requests wating for response
+            // reply from cache if have previous answer
+            if (DoOnceJob.cachedValues[purpose]) {
+                yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'returned cached value');
+                return DoOnceJob.cachedValues[purpose];
+            }
+            // add to a list of requests waiting on response
+            let p = new Promise(function (resolve, reject) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'Pausing thread while waiting for job');
+                    DoOnceJob.currentReqeusts[purpose].push(new DoOnceJob(pUuid, resolve));
+                });
+            });
+            // if this is the first request wanting the response, go get it async
+            if (DoOnceJob.currentReqeusts[purpose].length == 1) {
+                DoOnceJob.executeJobNotifyAndCacheResult(pUuid, purpose, action, cacheDuration);
+            }
+            // return a promise to be filled when the response is know
+            return p;
+        });
+    }
+    static removeCachedItem(pUuid, purpose) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (DoOnceJob.cachedValues[purpose]) {
+                yield addThreadingLog(pUuid, 'multiThreadDoOnce', purpose, 'item removed from cache');
+                delete DoOnceJob.cachedValues[purpose];
+            }
+        });
+    }
+    static clearCache(pUuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield addThreadingLog(pUuid, 'multiThreadDoOnce', '', 'cache cleared');
+            DoOnceJob.cachedValues = {};
+        });
+    }
+    // share same result with all concurrent reuests for a given purpose. Option to cache result for futher requests (-1 for ever, 0 no cache, 1+ cache duration in ms)
+    static executeJobNotifyAndCacheResult(pUuid, purpose, action, cacheDuration) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let jobValue = yield action(pUuid);
+            while (DoOnceJob.currentReqeusts[purpose].length > 0) {
+                let j = DoOnceJob.currentReqeusts[purpose].shift();
+                if (j != undefined) {
+                    j.resolve(jobValue);
+                    yield addThreadingLog(j.uuid, 'multiThreadDoOnce', purpose, 'resumed thread waiting for job');
+                }
+            }
+            switch (cacheDuration) {
+                case -1: // keep results in cache (until ram is cleared)
+                    DoOnceJob.cachedValues[purpose] = jobValue;
+                    yield addThreadingLog(pUuid, 'multiThreadDoOnce', purpose, 'job perma cached');
+                    return;
+                case 0: // results not cache, just concurrent requests share same answer
+                    return;
+                default: // cache for a specified number of ms
+                    DoOnceJob.cachedValues[purpose] = jobValue;
+                    yield pause(cacheDuration);
+                    delete DoOnceJob.cachedValues[purpose];
+                    return;
+            }
+        });
+    }
+}
+DoOnceJob.cachedValues = {};
+DoOnceJob.currentReqeusts = {};
+/*let doOnceStatus:GTS.DM.HashTable<number> = {};
+let doOnceWaiting:GTS.DM.HashTable<DoOnceWaitingJob[]> = {};
+export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:Function, timeout:number):Promise<T>{
+    await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'entered function');
+    let jobStatus:number = doOnceStatus[purpose]?doOnceStatus[purpose]:0;
+    doOnceStatus[purpose] = ++jobStatus;
+    if(!doOnceWaiting[purpose]){doOnceWaiting[purpose]=[];}
+    var jobValue:T;
+    if(jobStatus == 1){		// first in, do the job
+        await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'starting job');
+        
+        //TODO: timeout > 0 then doFuncOrTimeout else await action
+        jobValue = await action(uuid);
+        await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'finished job');
+        doOnceStatus[purpose] = jobStatus = 100;	// flag the job has been done, no more threads will be added now to waiting to resolve
+        // release any threads waiting on the completion of the job
+        let waitingToResolve = doOnceWaiting[purpose];
+        for(var i=0; i<waitingToResolve.length; i++){
+            waitingToResolve[i].resolve(jobValue);												// let any and all waiting in the que proceed now the job is done
+            await addThreadingLog(waitingToResolve[i].uuid,'multiThreadDoOnce',purpose,'resumed thread waiting for job');
+        }
+        waitingToResolve = doOnceWaiting[purpose] = [];		// clear list now they are all resolved
+        return new Promise(function(resolve, reject){resolve(jobValue)});
+    }
+    if(jobStatus < 100){// que additional requests that arrive while the job is being done
+        doOnceStatus[purpose] = --jobStatus;		// keep tracking value low, while waiting for the job to be done
+        return new Promise(async function(resolve, reject){
+            await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'Pausing thread while waiting for job');
+            doOnceWaiting[purpose].push({uuid:uuid,resolve:resolve});
+        });
+    }
+    if(jobStatus == 200){	// reset tracking to prevent too large a number being used
+        doOnceStatus[purpose] = jobStatus = 100;	// numbers 100 and above show the job has been done
+    }
+    // nothing to do as it was already done once
+    await addThreadingLog(uuid,'multiThreadDoOnce',purpose,'job was already completed');
+    return new Promise(function(resolve, reject){resolve(jobValue)});		//TODO: jobValue does not have its value (just is default value)
+} */
 // start a bunch of async functions and continue once they are all done
 function doAllAsync(jobs, uuid, purpose) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -156,6 +268,14 @@ function doAllAsync(jobs, uuid, purpose) {
     });
 }
 exports.doAllAsync = doAllAsync;
+class SingleLockWaitingJob {
+    constructor(pUuid, pAction, pResolve, pProcess) {
+        this.uuid = pUuid;
+        this.action = pAction;
+        this.resolve = pResolve;
+        this.process = pProcess;
+    }
+}
 let singleLockStatus = {};
 let singleLockWaiting = {};
 // Que jobs doing each on in turn in the order they arrive
@@ -290,6 +410,8 @@ class SequencedJob {
                         yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job qued #' + reqSequence, doLog);
                     });
                 });
+                //TODO: should the above return be a timeout
+                // Threading.doFuncOrTimeout
             }
             else {
                 yield addThreadingLog(uuid, 'SequencedStartLock', purpose, 'job arrived for too far in the future, wanted ' + expectedSequence + ' and got sequence #' + reqSequence, doLog);
@@ -297,6 +419,7 @@ class SequencedJob {
             }
         });
     }
+    //TODO: unque sequene job (as has timed out)
     processSequencedJob(doLog) {
         return __awaiter(this, void 0, void 0, function* () {
             //TODO: test decryption is legit  before sequence test/increment
@@ -444,52 +567,6 @@ function throttle(uuid, purpose, delay, action, doLog) {
     });
 }
 exports.throttle = throttle;
-function doWithTimeout(uuid, timeout, action) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let funcOver = false;
-        var ourTimeout; // ability to cancel time limit if work is done first
-        var promiseDoneOrTimedout; // how we will resolve this promise
-        let p = new Promise(function (resolve, reject) {
-            promiseDoneOrTimedout = resolve;
-        });
-        //console.log('done init');
-        limitTime(uuid, timeout);
-        //console.log('called limitTime');
-        doJob(uuid, action);
-        //console.log('called doJob');
-        return p;
-        function limitTime(uuid, timeout) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let delay = yield CancellableDelay.startCancellableDelay(timeout);
-                ourTimeout = delay.timeout;
-                yield delay.promise;
-                if (!funcOver) {
-                    funcOver = true;
-                    console.log('timeout finished first');
-                    promiseDoneOrTimedout([null, true]);
-                    return;
-                }
-                console.log('timeout finished after doJob');
-            });
-        }
-        function doJob(uuid, action) {
-            return __awaiter(this, void 0, void 0, function* () {
-                let res = yield action(uuid);
-                if (!funcOver) {
-                    funcOver = true;
-                    //console.log('doJob finished first');
-                    clearTimeout(ourTimeout);
-                    //console.log('time limit timeout cleared');
-                    promiseDoneOrTimedout([res, false]);
-                    //console.log('promise resolved');
-                    return;
-                }
-                console.log('doJob finished after timeout');
-            });
-        }
-    });
-}
-exports.doWithTimeout = doWithTimeout;
 function attachThreadingDebugInterface(web, webapp) {
     webapp.get('/threadinglogs', (req, res) => res.sendFile(web.getFile('threadinglogs.html')));
     web.registerHandler(webapp, '/req/threadinglogs', [], function (uuid) {
@@ -580,20 +657,6 @@ function attachThreadingDebugInterface(web, webapp) {
     });
 }
 exports.attachThreadingDebugInterface = attachThreadingDebugInterface;
-class SingleLockWaitingJob {
-    constructor(pUuid, pAction, pResolve, pProcess) {
-        this.uuid = pUuid;
-        this.action = pAction;
-        this.resolve = pResolve;
-        this.process = pProcess;
-    }
-}
-class DoOnceWaitingJob {
-    constructor(pUuid, pAction, pResolve, pProcess) {
-        this.uuid = pUuid;
-        this.resolve = pResolve;
-    }
-}
 // Multi-threading logic is logged. This may help future debugging
 class ThreadingLog {
     constructor() {
