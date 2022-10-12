@@ -306,6 +306,7 @@ export class Concurrency{
 				async function(purp:string, seq:number, act:Function):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
 					let seqCheck:string = await seqCheckAndIncr!(purp,seq);
+					console.log({seqCheck:seqCheck});
 					switch(seqCheck){
 						case "RunNow":
 							// The sequence of the job at hand is the expected sequence

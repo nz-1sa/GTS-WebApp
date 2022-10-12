@@ -307,6 +307,7 @@ class Concurrency {
                                 Concurrency.sequencedJobsWaiting[purp] = {};
                             }
                             let seqCheck = yield seqCheckAndIncr(purp, seq);
+                            console.log({ seqCheck: seqCheck });
                             switch (seqCheck) {
                                 case "RunNow":
                                     // The sequence of the job at hand is the expected sequence
