@@ -422,21 +422,15 @@ class Concurrency {
             var dr2;
             yield new Promise(function (resolveVarsSet) {
                 drSyncSchedule.getResult()
+                    .then((dr) => {
+                    dr2 = dr;
+                    resolveVarsSet();
+                    return;
+                })
                     .catch((err) => {
                     console.log(err);
                     haveError = true;
                     error = error + 'Seq Check Error: ' + err;
-                    resolveVarsSet();
-                    return;
-                })
-                    .then((dr) => {
-                    if (!dr) {
-                        haveError = true;
-                        error = error + 'Seq Check Error: void delayed result returned';
-                    }
-                    else {
-                        dr2 = dr;
-                    }
                     resolveVarsSet();
                     return;
                 });

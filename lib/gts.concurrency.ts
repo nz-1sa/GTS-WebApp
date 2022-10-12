@@ -387,20 +387,15 @@ export class Concurrency{
 		var dr2:DelayedResult<T>;
 		await new Promise<void>(function(resolveVarsSet:Function){
 			drSyncSchedule!.getResult()
+				.then((dr:DelayedResult<T>)=>{
+					dr2 = dr;
+					resolveVarsSet();
+					return;
+				})
 				.catch((err:any)=>{
 					console.log(err);
 					haveError = true;
 					error = error + 'Seq Check Error: '+err;
-					resolveVarsSet();
-					return;
-				})
-				.then((dr:DelayedResult<T>|void)=>{
-					if(!dr){
-						haveError = true;
-						error = error + 'Seq Check Error: void delayed result returned';
-					} else {
-						dr2 = dr;
-					}
 					resolveVarsSet();
 					return;
 				});
