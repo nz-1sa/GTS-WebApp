@@ -441,11 +441,11 @@ class Concurrency {
                     return;
                 });
             });
-            console.log('TWO');
             if (haveError) {
                 return Promise.reject(error);
             }
             else {
+                console.log('TWO');
                 // Sequence Job now scheduled (and could be already running)
                 let sjr = yield dr2.getResult();
                 console.log('THREE');
