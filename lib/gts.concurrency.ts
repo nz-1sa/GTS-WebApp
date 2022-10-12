@@ -99,8 +99,8 @@ export class Concurrency{
 					// do the job resolving the value being awaited on
 					async function(){let val:any = await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then((val:any)=>{resolve(val);});}
 				);
-				resolveVarsSet();
 			});
+			resolveVarsSet();
 		});
 		console.log('delayed result made');
 		if(errMsg.length > 0){
@@ -109,6 +109,10 @@ export class Concurrency{
 		}
 		console.log('calling job');
 		f!();				// call the function to the job
+		if(errMsg.length > 0){
+			console.log('error is '+errMsg);
+			return Promise.reject(errMsg);
+		}
 		console.log('returning promise for job');
 		return dr!;		// return object wrapper of promise to wait for the job to be done
 	}

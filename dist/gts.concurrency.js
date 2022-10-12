@@ -124,9 +124,9 @@ class Concurrency {
                             function () {
                                 return __awaiter(this, void 0, void 0, function* () { let val = yield fn(...args).catch((err) => { console.log(err); errMsg = 'ERROR:' + err; }).then((val) => { resolve(val); }); });
                             });
-                            resolveVarsSet();
                         });
                     });
+                    resolveVarsSet();
                 });
             });
             console.log('delayed result made');
@@ -136,6 +136,10 @@ class Concurrency {
             }
             console.log('calling job');
             f(); // call the function to the job
+            if (errMsg.length > 0) {
+                console.log('error is ' + errMsg);
+                return Promise.reject(errMsg);
+            }
             console.log('returning promise for job');
             return dr; // return object wrapper of promise to wait for the job to be done
         });
