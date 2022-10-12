@@ -446,7 +446,7 @@ class Session {
             if (res.rows[0].doseq == 0) {
                 return retval.setData("RunNow");
             }
-            if (res.rows[0].doseq < 10) {
+            if (res.rows[0].doseq > 0 && res.rows[0].doseq < 10) {
                 return retval.setData("RunSoon");
             }
             return retval.setData("Invalid");
