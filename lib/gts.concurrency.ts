@@ -383,21 +383,21 @@ export class Concurrency{
 		// One At a Time access now scheduled (and could be already running)
 		console.log('ONE');
 		let haveError:boolean = false;
-		var error:any;
+		let error:string = '';
 		var dr2:DelayedResult<T>;
 		await new Promise<void>(function(resolveVarsSet:Function){
 			drSyncSchedule!.getResult()
 				.catch((err:any)=>{
 					console.log(err);
 					haveError = true;
-					error = 'Seq Check Error: '+err;
+					error = error + 'Seq Check Error: '+err;
 					resolveVarsSet();
 					return;
 				})
 				.then((dr:DelayedResult<T>|void)=>{
 					if(!dr){
 						haveError = true;
-						error = 'Seq Check Error: void delayed result returned';
+						error = error + 'Seq Check Error: void delayed result returned';
 					} else {
 						dr2 = dr;
 					}

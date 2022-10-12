@@ -418,21 +418,21 @@ class Concurrency {
             // One At a Time access now scheduled (and could be already running)
             console.log('ONE');
             let haveError = false;
-            var error;
+            let error = '';
             var dr2;
             yield new Promise(function (resolveVarsSet) {
                 drSyncSchedule.getResult()
                     .catch((err) => {
                     console.log(err);
                     haveError = true;
-                    error = 'Seq Check Error: ' + err;
+                    error = error + 'Seq Check Error: ' + err;
                     resolveVarsSet();
                     return;
                 })
                     .then((dr) => {
                     if (!dr) {
                         haveError = true;
-                        error = 'Seq Check Error: void delayed result returned';
+                        error = error + 'Seq Check Error: void delayed result returned';
                     }
                     else {
                         dr2 = dr;
