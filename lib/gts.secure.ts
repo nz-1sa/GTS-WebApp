@@ -43,6 +43,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<WS.WebResponse>{
 	console.log('in handleStartSessionRequest');
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+	console.log('done hasSession check');
 	if(hs && s){
 		if(s!.status == SessionStatus.LoggedIn){
 			console.log('already logged in');
@@ -62,11 +63,16 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 		loopIteration++;
 	}
 	if(loopIteration == loopSafety){
+		console.log('loop safety break on session id generation');
 		return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
 	}
+	console.log('got session id');
 	// pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
 	let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
+	console.log('established session object');
+	console.log({uuid:uuid});
 	ns.addToDB(uuid);
+	console.log('session added to db');
 	ns.initialiseCaptcha(uuid, sessionId);
 	console.log('new session being returned');
 	return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
