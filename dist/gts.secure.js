@@ -422,20 +422,27 @@ class Session {
     // get a session from the database for the specified sessionId
     static getSessionFromDB(uuid, sessionId) {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log('in getSessionFromDB');
             let retval = new GTS.DM.WrappedResult();
             let fetchConn = yield DBCore.getConnection('Session.getSessionFromDB', uuid);
             if (fetchConn.error) {
+                console.log('db error ' + fetchConn.message);
                 return retval.setError('DB Connection error\n' + fetchConn.message);
             }
             if (fetchConn.data == null) {
+                console.log('db error, null connection returned');
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
+            console.log('got db client');
             const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
+            console.log('awaited db query');
             if (res.rowCount == 0) {
+                console.log('session not found.');
                 return retval.setError('Session not found.');
             }
             let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
+            console.log('got session object from db');
             //TODO: update last seen
             return retval.setData(s);
         });
