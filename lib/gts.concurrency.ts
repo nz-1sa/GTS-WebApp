@@ -276,18 +276,19 @@ export class Concurrency{
 	// SEQUENCED START JOBS
 	// --------------------
 	private static expectedSequenceLookup: GTS.DM.HashTable<number> = {};
-	public static inMemorySequenceTracking(purpose:string, sequence:number):string{
+	public static inMemorySequenceTracking(purpose:string, sequence:number):GTS.DM.WrappedResult<string>{
+		let retval:GTS.DM.WrappedResult<string> = new GTS.DM.WrappedResult();
 		// ensure storage for sequence for purpose
 		if(!Concurrency.expectedSequenceLookup[purpose]){ Concurrency.expectedSequenceLookup[purpose]=1;}
 		// get the number of the expected sequence (starts at 1)
 		let expectedSequence:number = Concurrency.expectedSequenceLookup[purpose];
 		//console.log({log:'sequence test', purpose:purpose, sequence:sequence,expectedSequence:expectedSequence});
 		// return "RunNow" when the sequence is that expected
-		if(sequence == expectedSequence){Concurrency.expectedSequenceLookup[purpose]=++sequence; return "RunNow";}
+		if(sequence == expectedSequence){Concurrency.expectedSequenceLookup[purpose]=++sequence; return retval.setData("RunNow");}
 		// return "RunSoon" if the sequence is due to run soon
-		if(sequence < (expectedSequence+10)){ return "RunSoon"; }
+		if(sequence < (expectedSequence+10)){ return retval.setData("RunSoon"); }
 		// return "Invalid" if the sequence is already run or is too far in the future
-		return "Invalid";
+		return retval.setData("Invalid");
 	}
 
 	private static sequencedJobsWaiting: GTS.DM.HashTable<GTS.DM.HashTable<Function>> = {};
@@ -305,9 +306,10 @@ export class Concurrency{
 				purpose,		// que identifier (can have multiple ques run in parallel)
 				async function(purp:string, seq:number, act:Function):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
-					let seqCheck:string = await seqCheckAndIncr!(purp,seq);
-					console.log({seqCheck:seqCheck});
-					switch(seqCheck){
+					let seqCheck:GTS.DM.WrappedResult<string> = await seqCheckAndIncr!(purp,seq);
+					// wrapped result
+					console.log({seqCheck:seqCheck.data});
+					switch(seqCheck.data){
 						case "RunNow":
 							// The sequence of the job at hand is the expected sequence
 							// Prepare a delayed result that does the job

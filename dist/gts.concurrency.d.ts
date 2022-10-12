@@ -1,3 +1,4 @@
+import * as GTS from "./gts";
 declare class CancellableDelay {
     timeout: number;
     promise: Promise<void>;
@@ -25,7 +26,7 @@ export declare class Concurrency {
     static executeJobNotifyAndCacheResult<T>(purpose: string, action: Function, cacheDuration: number): Promise<void>;
     static doAllAsync<T>(jobs: Function[]): Promise<T[]>;
     private static expectedSequenceLookup;
-    static inMemorySequenceTracking(purpose: string, sequence: number): string;
+    static inMemorySequenceTracking(purpose: string, sequence: number): GTS.DM.WrappedResult<string>;
     private static sequencedJobsWaiting;
     static doSequencedJob<T>(purpose: string, sequence: number, action: Function, seqCheckAndIncr?: Function): Promise<T>;
 }

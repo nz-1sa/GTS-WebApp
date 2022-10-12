@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -10,6 +33,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Concurrency = exports.DelayedResult = void 0;
+const GTS = __importStar(require("./gts"));
 // Holds a promise that is resolved when a delay is completed, and a timeout that can clear/cancel the delay
 class CancellableDelay {
     constructor(pTimeout, pPromise) {
@@ -271,6 +295,7 @@ class Concurrency {
         });
     }
     static inMemorySequenceTracking(purpose, sequence) {
+        let retval = new GTS.DM.WrappedResult();
         // ensure storage for sequence for purpose
         if (!Concurrency.expectedSequenceLookup[purpose]) {
             Concurrency.expectedSequenceLookup[purpose] = 1;
@@ -281,14 +306,14 @@ class Concurrency {
         // return "RunNow" when the sequence is that expected
         if (sequence == expectedSequence) {
             Concurrency.expectedSequenceLookup[purpose] = ++sequence;
-            return "RunNow";
+            return retval.setData("RunNow");
         }
         // return "RunSoon" if the sequence is due to run soon
         if (sequence < (expectedSequence + 10)) {
-            return "RunSoon";
+            return retval.setData("RunSoon");
         }
         // return "Invalid" if the sequence is already run or is too far in the future
-        return "Invalid";
+        return retval.setData("Invalid");
     }
     static doSequencedJob(purpose, sequence, action, seqCheckAndIncr) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -307,8 +332,9 @@ class Concurrency {
                                 Concurrency.sequencedJobsWaiting[purp] = {};
                             }
                             let seqCheck = yield seqCheckAndIncr(purp, seq);
-                            console.log({ seqCheck: seqCheck });
-                            switch (seqCheck) {
+                            // wrapped result
+                            console.log({ seqCheck: seqCheck.data });
+                            switch (seqCheck.data) {
                                 case "RunNow":
                                     // The sequence of the job at hand is the expected sequence
                                     // Prepare a delayed result that does the job
