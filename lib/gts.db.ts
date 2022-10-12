@@ -1,5 +1,5 @@
 import * as GTS from "./gts";
-import * as Threading from "./gts.threading";
+import { DelayedResult, Concurrency } from "./gts.concurrency";
 import * as Pg from 'pg';
 
 // Client connections returned are pg Pool Clients
@@ -35,7 +35,7 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 	if(client){ return retval.setData(client); }								// provide the connection to the caller
 	
 	// Require that only one thread can be opening a connection at a time, others will be qued
-	let connResult:GTS.DM.WrappedResult<Pg.PoolClient> = await Threading.singleLock<GTS.DM.WrappedResult<Pg.PoolClient>>('openDbConnection',uuid, async function(uuid:string){
+	let dr:DelayedResult<GTS.DM.WrappedResult<Pg.PoolClient>> = await Concurrency.limitToOneAtATime<GTS.DM.WrappedResult<Pg.PoolClient>>('openDbConnection', async function(uuid:string){
 		// when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
 		let c:Pg.PoolClient = clientPool.openConnections[uuid];	
 		if(c){ return new GTS.DM.WrappedResult().setData(c); }	// provide the connection to variable connResult
@@ -60,7 +60,9 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 		}
 		console.error(`${Date.now()} connection not got`);			// return there was an error if we did not get a connection
 		return new GTS.DM.WrappedResult().setError('connection not got for db\r\n');
-	}, false);	//this trailing false says don't log the threading used to open a db connection, so as not enter a recursive loop;   log thread -> connect to db -> log thread -> connect to db -> ...
+	}, uuid);
+	
+	let connResult:GTS.DM.WrappedResult<Pg.PoolClient> = await dr.getResult();
 	
 	// We know have the result of opening the connection in connResult
 	if(connResult.error){																// return to caller error info if there was an error opening the connection

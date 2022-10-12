@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.throttle = exports.SequencedJob = exports.singleLock = exports.doAllAsync = exports.doFuncOrTimeout = exports.CancellableDelay = exports.pause = void 0;
+exports.DB = exports.ThreadingLog = exports.attachThreadingDebugInterface = exports.throttle = exports.SequencedJob = exports.singleLock = exports.doAllAsync = exports.doFuncOrTimeout = exports.Concurrency = exports.CancellableDelay = exports.pause = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const WS = __importStar(require("./gts.webserver"));
@@ -80,6 +80,64 @@ class CancellableDelay {
     }
 }
 exports.CancellableDelay = CancellableDelay;
+class Concurrency {
+    // provide setTimeout such that it can be awaited on
+    static pause(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    // for a given purpose, limit concurrency to one at a time
+    static limitToOneAtATime(purpose, fn, ...args) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // ensure there is a promise defined to limit execution to one at a time for the specified purpose
+            if (!Concurrency.limitOneAtATimePromises[purpose]) {
+                Concurrency.limitOneAtATimePromises[purpose] = Promise.resolve();
+            }
+            ;
+            // get the value from when the job is done
+            var retval = yield new Promise(function (resolve) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    // wait for other jobs that are scheduled to be done first
+                    yield Concurrency.limitOneAtATimePromises[purpose];
+                    // set that this job is the job to be done
+                    Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
+                    // do the job resolving the value being awaited on
+                    function () {
+                        return __awaiter(this, void 0, void 0, function* () { resolve(yield fn(...args)); });
+                    });
+                });
+            });
+            // return the value
+            return retval;
+        });
+    }
+}
+exports.Concurrency = Concurrency;
+// allow limit on concurrency to be within a defined purpose
+Concurrency.limitOneAtATimePromises = {};
+{
+    timeout: NodeJS.Timeout; // the timeout from a setTimeout (clear to cancel)
+    promise: Promise(); // the promise that is resolved the the setTimout finishes
+    constructor(pTimeout, NodeJS.Timeout, pPromise, Promise(), {
+        this: .timeout = pTimeout,
+        this: .promise = pPromise
+    });
+}
+async;
+startCancellableDelay(ms, number);
+Promise < CancellableDelay > {
+    // ability to cancel the timeout, init to a dummy value to allow code to compile
+    var: delayTimeout, NodeJS, : .Timeout = setTimeout(() => null, 1),
+    // the promise that resolves when the timeout is done, init to a dummy value to allow code to compile
+    var: delayPromise, void:  > , Promise, : .resolve(),
+    // set the real values for delayTimeout and delayPromise
+    await: new Promise(function (resolveTimeoutSet, rejectTimeoutSet) {
+        delayPromise = new Promise(function (resolve, reject) { delayTimeout = setTimeout(resolve, ms); resolveTimeoutSet(); });
+    }),
+    // return the results
+    return: new CancellableDelay(delayTimeout, delayPromise)
+};
+;
+// start doing a job, but return if the allowed time is up. NOTE: job continues to run when timeout occurs, just the result is no longer waited on
 function doFuncOrTimeout(uuid, timeout, action) {
     return __awaiter(this, void 0, void 0, function* () {
         let funcOver = false;
@@ -127,18 +185,27 @@ class DoOnceJob {
         this.uuid = pUuid;
         this.resolve = pResolve;
     }
+    // synchronously do async jobs
+    static doSyncCheckJobCountIsInProgress() {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield checkJobCountIsInProgressPromise; // wait for any previous check that is pending
+            checkJobCountIsInProgressPromise = checkJobCountIsInProgressPromise.then(() => fn(...args)); // get others to wait while we check
+        });
+    }
+    // get the result for purpose from cache, or by doing action and then cache the result for cacheDuration ms, -1 is cache forever, 0 is only cache concurrent requests
     static executeOnce(pUuid, purpose, action, cacheDuration) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'entered function');
+            yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'entered function'); // if logging is on then add a log that this method has been called
             if (!DoOnceJob.currentReqeusts[purpose]) {
                 DoOnceJob.currentReqeusts[purpose] = [];
             }
-            ; // ensure storage of requests wating for response
+            ; // ensure storage is initiated for requests wating for the specified purpose
             // reply from cache if have previous answer
             if (DoOnceJob.cachedValues[purpose]) {
-                yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'returned cached value');
-                return DoOnceJob.cachedValues[purpose];
+                yield addThreadingLog(pUuid, 'DoOnceJob.executeOnce', purpose, 'returned cached value'); // if logging is on then add a log that the valiue has been returned from cache
+                return DoOnceJob.cachedValues[purpose]; // return the value for the purpose
             }
+            //TODO: this should be in a que to prevent similtaneous calls missing starting the job
             // add to a list of requests waiting on response
             let p = new Promise(function (resolve, reject) {
                 return __awaiter(this, void 0, void 0, function* () {
@@ -150,22 +217,25 @@ class DoOnceJob {
             if (DoOnceJob.currentReqeusts[purpose].length == 1) {
                 DoOnceJob.executeJobNotifyAndCacheResult(pUuid, purpose, action, cacheDuration);
             }
-            // return a promise to be filled when the response is know
+            //END OF TODO
+            // return a promise to be waited on that is fulfilled when the response is known
             return p;
         });
     }
+    // remove the cached value for a specified purpose, uuid is an identifier for logging
     static removeCachedItem(pUuid, purpose) {
         return __awaiter(this, void 0, void 0, function* () {
             if (DoOnceJob.cachedValues[purpose]) {
-                yield addThreadingLog(pUuid, 'multiThreadDoOnce', purpose, 'item removed from cache');
-                delete DoOnceJob.cachedValues[purpose];
+                yield addThreadingLog(pUuid, 'multiThreadDoOnce', purpose, 'item removed from cache'); // if logging is on add a log that the cached value for purpose has been removed
+                delete DoOnceJob.cachedValues[purpose]; // remove the cached value
             }
         });
     }
+    // remove all cached values, uuid is an identifier for logging
     static clearCache(pUuid) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield addThreadingLog(pUuid, 'multiThreadDoOnce', '', 'cache cleared');
-            DoOnceJob.cachedValues = {};
+            yield addThreadingLog(pUuid, 'multiThreadDoOnce', '', 'cache cleared'); // if logging is on add a log that the cached values have been cleared
+            DoOnceJob.cachedValues = {}; // clear the cached values
         });
     }
     // share same result with all concurrent reuests for a given purpose. Option to cache result for futher requests (-1 for ever, 0 no cache, 1+ cache duration in ms)
@@ -195,8 +265,12 @@ class DoOnceJob {
         });
     }
 }
+// cached values from executeOnce calls (values cached for purpose)
 DoOnceJob.cachedValues = {};
+// lists of pending requests (grouped by purpose)
 DoOnceJob.currentReqeusts = {};
+// a promise is used to ensure there will not be concurrent checks of if to do the request. Resolved at first as is not in use
+DoOnceJob.checkJobCountIsInProgressPromise = Promise.resolve();
 /*let doOnceStatus:GTS.DM.HashTable<number> = {};
 let doOnceWaiting:GTS.DM.HashTable<DoOnceWaitingJob[]> = {};
 export async function multiThreadDoOnce<T>(purpose:string, uuid:string, action:Function, timeout:number):Promise<T>{

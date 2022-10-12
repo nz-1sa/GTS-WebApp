@@ -1,6 +1,6 @@
 import * as GTS from "./gts";
 import * as DBCore from "./gts.db";
-import * as Threading from './gts.threading';
+import {Concurrency} from './gts.concurrency';
 import *  as WebApp from './gts.webapp';
 
 // make a unique identifier, it is a timestamp first uuid and includes the mac of the machine made on
@@ -57,7 +57,7 @@ export async function addTestUUIDs(sessionUUID:string):Promise<GTS.DM.WrappedRes
 // get a randomness from slight extra delay introduced in calls to setTimeout
 async function randomDelay(): Promise<number>{
 	var startTime:number = new Date().getTime();
-	await Threading.pause(10);
+	await Concurrency.pause(10);
 	var endTime:number = new Date().getTime();
 	return(endTime - startTime);
 }

@@ -37,7 +37,7 @@ const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
 const WS = __importStar(require("./gts.webserver"));
-const Threading = __importStar(require("./gts.threading"));
+const gts_concurrency_1 = require("./gts.concurrency");
 var crypto = require('crypto');
 const Encodec = __importStar(require("./gts.encodec"));
 const GIFEncoder = require('gifencoder');
@@ -118,7 +118,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
             return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
         }
         //TODO: get knownSaltPassHash for email address from database
-        let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
+        let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI='; //knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
         console.log('using debug key to decode');
         console.log({ knownSaltPassHash: knownSaltPassHash, captcha: sess.captcha, challenge: challenge });
         // decrypt challenge using knownSaltPassHash and captcha
@@ -225,7 +225,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         // by getting to here there is a logged in session
         let doLogSequenceCheck = true;
         let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-        yield Threading.SequencedJob.attemptSequencedJob(uuid, sess.sessionId, parseInt(sequence), sess.seq, Session.checkAndIncrementSequenceInDB, function (uuid, purpose, seqNum) {
+        yield gts_concurrency_1.Concurrency.doSequencedJob('talkSession' + sess.sessionId, parseInt(sequence), function (purpose, seqNum) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);
                 console.log({ pass: sess.password, nonce: sess.nonce + seqNum });
@@ -241,9 +241,9 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                 console.log(adminResp);
                 return adminResp;
             });
-        }, doLogSequenceCheck)
-            .then(adminResponse => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), sess.password, (sess.nonce + parseInt(sequence)))}"`, []); })
-            .catch(err => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
+        }, Session.checkAndIncrementSequenceInDB)
+            .then((adminResponse) => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), sess.password, (sess.nonce + parseInt(sequence)))}"`, []); })
+            .catch((err) => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
         console.log('retval is');
         console.log(retval.toString());
         return retval;
@@ -425,6 +425,7 @@ class Session {
             return retval.setData(s);
         });
     }
+    //TODO: needs to be like Concurrency.inMemorySequenceTracking
     static checkAndIncrementSequenceInDB(uuid, sessionId, reqSequence) {
         return __awaiter(this, void 0, void 0, function* () {
             let retval = new GTS.DM.WrappedResult();
@@ -442,8 +443,13 @@ class Session {
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }
-            console.log({ doseq: res.rows[0].doseq, reqSequence: reqSequence });
-            return retval.setData(res.rows[0].doseq == reqSequence);
+            if (res.rows[0].doseq == 0) {
+                return retval.setData("RunNow");
+            }
+            if (res.rows[0].doseq < 10) {
+                return retval.setData("RunSoon");
+            }
+            return retval.setData("Invalid");
         });
     }
     // list all the sessions from the database in full detail

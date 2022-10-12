@@ -34,7 +34,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.releaseConnection = exports.hasConnection = exports.getConnection = exports.ClientPool = void 0;
 const GTS = __importStar(require("./gts"));
-const Threading = __importStar(require("./gts.threading"));
+const gts_concurrency_1 = require("./gts.concurrency");
 const Pg = __importStar(require("pg"));
 // Create a pg Pool from a saved database connection string
 const dbConn = process.env.DATABASE_URL;
@@ -68,7 +68,7 @@ function getConnection(purpose, uuid) {
             return retval.setData(client);
         } // provide the connection to the caller
         // Require that only one thread can be opening a connection at a time, others will be qued
-        let connResult = yield Threading.singleLock('openDbConnection', uuid, function (uuid) {
+        let dr = yield gts_concurrency_1.Concurrency.limitToOneAtATime('openDbConnection', function (uuid) {
             return __awaiter(this, void 0, void 0, function* () {
                 // when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
                 let c = clientPool.openConnections[uuid];
@@ -96,7 +96,8 @@ function getConnection(purpose, uuid) {
                 console.error(`${Date.now()} connection not got`); // return there was an error if we did not get a connection
                 return new GTS.DM.WrappedResult().setError('connection not got for db\r\n');
             });
-        }, false); //this trailing false says don't log the threading used to open a db connection, so as not enter a recursive loop;   log thread -> connect to db -> log thread -> connect to db -> ...
+        }, uuid);
+        let connResult = yield dr.getResult();
         // We know have the result of opening the connection in connResult
         if (connResult.error) { // return to caller error info if there was an error opening the connection
             console.error(`${Date.now()} error getting connection ${connResult.message}`);

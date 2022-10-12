@@ -28,7 +28,7 @@ export declare class Session {
     static fromStrings(id: string, sessionId: string, created: string, lastSeen: string, ip: string, status: string, captcha: string, nonce: string, password: string, seq: string, chkSum: string): Session | null;
     static isProposedSessionIdUnique(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<boolean>>;
     static getSessionFromDB(uuid: string, sessionId: string): Promise<GTS.DM.WrappedResult<Session>>;
-    static checkAndIncrementSequenceInDB(uuid: string, sessionId: string, reqSequence: number): Promise<GTS.DM.WrappedResult<boolean>>;
+    static checkAndIncrementSequenceInDB(uuid: string, sessionId: string, reqSequence: number): Promise<GTS.DM.WrappedResult<string>>;
     static fetchAllFromDB(uuid: string): Promise<GTS.DM.WrappedResult<Session[]>>;
     addToDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;
     updateDB(uuid: string): Promise<GTS.DM.WrappedResult<null>>;

@@ -4,7 +4,7 @@ import * as UUID from "./gts.uuid";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
 import *  as WebApp from './gts.webapp';
-import * as Threading from "./gts.threading";
+import {Concurrency} from './gts.concurrency';
 var crypto = require('crypto');
 import * as Encodec from './gts.encodec';
 
@@ -84,7 +84,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	}
 	
 	//TODO: get knownSaltPassHash for email address from database
-	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';
+	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
 	
 	console.log('using debug key to decode');
 	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
@@ -199,7 +199,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-	await Threading.SequencedJob.attemptSequencedJob<WS.WebResponse>(uuid, sess.sessionId, parseInt(sequence), sess.seq, Session.checkAndIncrementSequenceInDB, async function(uuid:string, purpose:string, seqNum:number){
+	await Concurrency.doSequencedJob<WS.WebResponse>('talkSession'+sess.sessionId, parseInt(sequence), async function(purpose:string, seqNum:number){ // uuid:string, 
 		console.log('talking at number #'+seqNum);
 		console.log({pass:sess.password, nonce:sess.nonce+seqNum});
 		
@@ -219,9 +219,9 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 		return adminResp;
 		
 		
-	}, doLogSequenceCheck)
-		.then(adminResponse => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
-		.catch(err => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
+	}, Session.checkAndIncrementSequenceInDB)
+		.then((adminResponse:WS.WebResponse) => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
+		.catch((err:any) => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
 	console.log('retval is');
 	console.log(retval.toString());
 	return retval;
@@ -341,8 +341,9 @@ export class Session{
 		return retval.setData( s );
 	}
 	
-	static async checkAndIncrementSequenceInDB(uuid:string, sessionId:string, reqSequence:number): Promise<GTS.DM.WrappedResult<boolean>>{
-		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+	//TODO: needs to be like Concurrency.inMemorySequenceTracking
+	static async checkAndIncrementSequenceInDB(uuid:string, sessionId:string, reqSequence:number): Promise<GTS.DM.WrappedResult<string>>{
+		let retval: GTS.DM.WrappedResult<string> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
 		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }
 		if(fetchConn.data == null){ return retval.setError('DB Connection NULL error'); }
@@ -351,8 +352,10 @@ export class Session{
 		console.log({sessionId:sessionId, reqSequence:reqSequence});
 		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[sessionId,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
-		console.log({doseq:res.rows[0].doseq, reqSequence:reqSequence});
-		return retval.setData(res.rows[0].doseq == reqSequence);
+		
+		if(res.rows[0].doseq==0){ return retval.setData("RunNow"); }
+		if(res.rows[0].doseq < 10){ return retval.setData("RunSoon"); }
+		return retval.setData("Invalid");
 	}
 	
 	// list all the sessions from the database in full detail

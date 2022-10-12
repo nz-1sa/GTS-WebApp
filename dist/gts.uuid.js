@@ -35,7 +35,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.addTestUUIDs = exports.newUUID = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
-const Threading = __importStar(require("./gts.threading"));
+const gts_concurrency_1 = require("./gts.concurrency");
 const WebApp = __importStar(require("./gts.webapp"));
 // make a unique identifier, it is a timestamp first uuid and includes the mac of the machine made on
 function newUUID() {
@@ -90,7 +90,7 @@ exports.addTestUUIDs = addTestUUIDs;
 function randomDelay() {
     return __awaiter(this, void 0, void 0, function* () {
         var startTime = new Date().getTime();
-        yield Threading.pause(10);
+        yield gts_concurrency_1.Concurrency.pause(10);
         var endTime = new Date().getTime();
         return (endTime - startTime);
     });

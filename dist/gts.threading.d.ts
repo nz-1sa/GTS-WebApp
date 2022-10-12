@@ -9,6 +9,13 @@ export declare class CancellableDelay {
     constructor(pTimeout: NodeJS.Timeout, pPromise: Promise<void>);
     static startCancellableDelay(ms: number): Promise<CancellableDelay>;
 }
+export declare class Concurrency {
+    static pause(ms: number): Promise<void>;
+    private static limitOneAtATimePromises;
+    static limitToOneAtATime<T>(purpose: string, fn: Function, ...args: any[]): Promise<T>;
+    class: any;
+    CancellableDelay: any;
+}
 export declare function doFuncOrTimeout<T>(uuid: string, timeout: number, action: Function): Promise<[T, boolean]>;
 export declare function doAllAsync(jobs: Function[], uuid: string, purpose: string): Promise<void>;
 export declare function singleLock<T>(purpose: string, uuid: string, action: Function, doLog?: boolean): Promise<T>;

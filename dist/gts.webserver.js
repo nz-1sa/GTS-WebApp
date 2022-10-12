@@ -36,7 +36,7 @@ exports.DB = exports.Weblog = exports.WebResponse = exports.Cookie = exports.Web
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
-const Threading = __importStar(require("./gts.threading"));
+const gts_concurrency_1 = require("./gts.concurrency");
 const PATH = require('path');
 class WebServerHelper {
     // initialise a new uuid register when the WebServerHelper is instantiated
@@ -238,7 +238,7 @@ class WebServerHelper {
                 }
                 // get the response for the request
                 let timedOut = false;
-                [response, timedOut] = yield Threading.doFuncOrTimeout(uuid, 90000, function (uuid) {
+                [response, timedOut] = yield gts_concurrency_1.Concurrency.doFuncOrTimeout(90000, function () {
                     return __awaiter(this, void 0, void 0, function* () { return yield work(uuid, req.ip, req.cookies, ...paramVals); });
                 });
                 if (timedOut) {

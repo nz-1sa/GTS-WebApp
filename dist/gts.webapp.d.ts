@@ -3,7 +3,7 @@ export * as GTS from "./gts";
 export * as UUID from "./gts.uuid";
 export * as DBCore from "./gts.db";
 export * as WS from "./gts.webserver";
-export * as Threading from "./gts.threading";
+export { Concurrency, DelayedResult } from "./gts.concurrency";
 export * as Secure from "./gts.secure";
 export * as Encodec from "./gts.encodec";
 export { WebResponse } from "./gts.webserver";
