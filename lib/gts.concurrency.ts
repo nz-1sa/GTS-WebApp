@@ -358,13 +358,21 @@ export class Concurrency{
 				purpose, sequence, action	// parameters to the function that is run
 			);
 			resolveOneAtATimeAccessScheduled();
-		})
+		});
 		
 		// One At a Time access now scheduled (and could be already running)
-		let dr2:DelayedResult<T> = await drSyncSchedule!.getResult();
-		// Sequence Job now scheduled (and could be already running)
-		let s:T = await dr2.getResult();
-		// Sequence job has been executed, return the value from the executed job
-		return s;
+		var dr2:DelayedResult<T>;
+		try{
+			dr2 = await drSyncSchedule!.getResult();
+			// Sequence Job now scheduled (and could be already running)
+			let sjr:T = await dr2.getResult();
+			// Sequence job has been executed, return the value from the executed job
+			return sjr;
+		} catch(err:any){
+			console.log(err);
+			return Promise.reject(err);
+		}
+		
+		
 	}
 }

@@ -393,11 +393,18 @@ class Concurrency {
                 });
             });
             // One At a Time access now scheduled (and could be already running)
-            let dr2 = yield drSyncSchedule.getResult();
-            // Sequence Job now scheduled (and could be already running)
-            let s = yield dr2.getResult();
-            // Sequence job has been executed, return the value from the executed job
-            return s;
+            var dr2;
+            try {
+                dr2 = yield drSyncSchedule.getResult();
+                // Sequence Job now scheduled (and could be already running)
+                let sjr = yield dr2.getResult();
+                // Sequence job has been executed, return the value from the executed job
+                return sjr;
+            }
+            catch (err) {
+                console.log(err);
+                return Promise.reject(err);
+            }
         });
     }
 }
