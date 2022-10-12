@@ -41,11 +41,14 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 
 // establish a session to allow logging in
 async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<WS.WebResponse>{
+	console.log('in handleStartSessionRequest');
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
 	if(hs && s){
 		if(s!.status == SessionStatus.LoggedIn){
+			console.log('already logged in');
 			return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`,`Already logged in`, []);
 		}
+		console.log('initialise already done');
 		return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
 	}
 	let now:Date = new Date();
@@ -65,6 +68,7 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 	let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
 	ns.addToDB(uuid);
 	ns.initialiseCaptcha(uuid, sessionId);
+	console.log('new session being returned');
 	return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
 }
 
