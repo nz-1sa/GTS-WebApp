@@ -1,6 +1,6 @@
 {
   "name": "gts-webapp",
-  "version": "1.6.32",
+  "version": "1.6.33",
   "description": "Framework to help build web applications",
   "main": "./dist/gts.webapp.js",
   "types": "./dist/gts.webapp.d.ts",

@@ -225,7 +225,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         // by getting to here there is a logged in session
         let doLogSequenceCheck = true;
         let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-        yield gts_concurrency_1.Concurrency.doSequencedJob('talkSession' + sess.sessionId, parseInt(sequence), function (purpose, seqNum) {
+        yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, parseInt(sequence), function (purpose, seqNum) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);
                 console.log({ pass: sess.password, nonce: sess.nonce + seqNum });
