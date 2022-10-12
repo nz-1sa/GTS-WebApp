@@ -425,14 +425,14 @@ class Concurrency {
                     .catch((err) => {
                     console.log(err);
                     haveError = true;
-                    error = err;
+                    error = 'Seq Check Error: ' + err;
                     resolveVarsSet();
                     return;
                 })
                     .then((dr) => {
                     if (!dr) {
                         haveError = true;
-                        error = 'void delayed result returned';
+                        error = 'Seq Check Error: void delayed result returned';
                     }
                     else {
                         dr2 = dr;

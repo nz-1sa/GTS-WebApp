@@ -390,14 +390,14 @@ export class Concurrency{
 				.catch((err:any)=>{
 					console.log(err);
 					haveError = true;
-					error = err;
+					error = 'Seq Check Error: '+err;
 					resolveVarsSet();
 					return;
 				})
 				.then((dr:DelayedResult<T>|void)=>{
 					if(!dr){
 						haveError = true;
-						error = 'void delayed result returned';
+						error = 'Seq Check Error: void delayed result returned';
 					} else {
 						dr2 = dr;
 					}
