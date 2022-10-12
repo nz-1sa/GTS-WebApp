@@ -418,9 +418,12 @@ class Concurrency {
             // One At a Time access now scheduled (and could be already running)
             var dr2;
             try {
+                console.log('ONE');
                 dr2 = yield drSyncSchedule.getResult();
+                console.log('TWO');
                 // Sequence Job now scheduled (and could be already running)
                 let sjr = yield dr2.getResult();
+                console.log('THREE');
                 // Sequence job has been executed, return the value from the executed job
                 return sjr;
             }

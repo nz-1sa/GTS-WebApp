@@ -383,9 +383,12 @@ export class Concurrency{
 		// One At a Time access now scheduled (and could be already running)
 		var dr2:DelayedResult<T>;
 		try{
+			console.log('ONE');
 			dr2 = await drSyncSchedule!.getResult();
+			console.log('TWO');
 			// Sequence Job now scheduled (and could be already running)
 			let sjr:T = await dr2.getResult();
+			console.log('THREE');
 			// Sequence job has been executed, return the value from the executed job
 			return sjr;
 		} catch(err:any){
