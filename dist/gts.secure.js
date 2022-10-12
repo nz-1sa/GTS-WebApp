@@ -115,16 +115,21 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
 // process login for a session
 function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log('in handleLoginRequest');
         // check that there is an open session to log in to
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+        console.log('done hasSession check');
         if (!hs || !s) {
+            console.log('returning no session error');
             return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
         }
         let sess = s;
         if (sess.ip != requestIp) {
+            console.log('wrong session ip');
             return new WS.WebResponse(false, "ERROR: Can not change IP during session.", `UUID:${uuid} Login called from wrong IP.`, '', []);
         }
         if (sess.status != SessionStatus.Initialised) {
+            console.log('wrong session state, only can login from Initialised');
             return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
         }
         //TODO: get knownSaltPassHash for email address from database
