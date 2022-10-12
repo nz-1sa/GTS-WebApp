@@ -361,7 +361,7 @@ export class Session{
 	}
 	
 	//TODO: needs to be like Concurrency.inMemorySequenceTracking
-	static async checkAndIncrementSequenceInDB(uuid:string, sessionId:string, reqSequence:number): Promise<GTS.DM.WrappedResult<string>>{
+	static async checkAndIncrementSequenceInDB(sessionId:string, reqSequence:number, uuid:string): Promise<GTS.DM.WrappedResult<string>>{
 		let retval: GTS.DM.WrappedResult<string> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
 		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }

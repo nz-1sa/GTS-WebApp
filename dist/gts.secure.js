@@ -448,7 +448,7 @@ class Session {
         });
     }
     //TODO: needs to be like Concurrency.inMemorySequenceTracking
-    static checkAndIncrementSequenceInDB(uuid, sessionId, reqSequence) {
+    static checkAndIncrementSequenceInDB(sessionId, reqSequence, uuid) {
         return __awaiter(this, void 0, void 0, function* () {
             let retval = new GTS.DM.WrappedResult();
             let fetchConn = yield DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
