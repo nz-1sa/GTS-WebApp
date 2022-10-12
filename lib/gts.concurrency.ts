@@ -382,29 +382,39 @@ export class Concurrency{
 		
 		// One At a Time access now scheduled (and could be already running)
 		console.log('ONE');
-		let dr2:DelayedResult<T> = await drSyncSchedule!.getResult()
-			.catch((err:any)=>{
-				console.log(err);
-				return Promise.reject(err);
-			});
-		
+		let haveError:boolean = false;
+		var error:any;
+		var dr2:DelayedResult<T>;
+		await new Promise<void>(function(resolveVarsSet:Function){
+			drSyncSchedule!.getResult()
+				.catch((err:any)=>{
+					console.log(err);
+					haveError = true;
+					error = err;
+					resolveVarsSet();
+					return;
+				})
+				.then((dr:DelayedResult<T>|void)=>{
+					if(!dr){
+						haveError = true;
+						error = 'void delayed result returned';
+					} else {
+						dr2 = dr;
+					}
+					resolveVarsSet();
+					return;
+				});
+		});
 		console.log('TWO');
-		// Sequence Job now scheduled (and could be already running)
-		let sjr:T = await dr2.getResult();
-		console.log('THREE');
-		// Sequence job has been executed, return the value from the executed job
-		return sjr;
-		
-			
-		
-		/* try{
-			
-			
-		} catch(err:any){
-			console.log(err);
-			return Promise.reject(err);
-		} */
-		
+		if(haveError){
+			return Promise.reject(error);
+		} else {
+			// Sequence Job now scheduled (and could be already running)
+			let sjr:T = await dr2!.getResult();
+			console.log('THREE');
+			// Sequence job has been executed, return the value from the executed job
+			return sjr;
+		}
 		
 	}
 }

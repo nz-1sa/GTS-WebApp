@@ -417,24 +417,41 @@ class Concurrency {
             });
             // One At a Time access now scheduled (and could be already running)
             console.log('ONE');
-            let dr2 = yield drSyncSchedule.getResult()
-                .catch((err) => {
-                console.log(err);
-                return Promise.reject(err);
+            let haveError = false;
+            var error;
+            var dr2;
+            yield new Promise(function (resolveVarsSet) {
+                drSyncSchedule.getResult()
+                    .catch((err) => {
+                    console.log(err);
+                    haveError = true;
+                    error = err;
+                    resolveVarsSet();
+                    return;
+                })
+                    .then((dr) => {
+                    if (!dr) {
+                        haveError = true;
+                        error = 'void delayed result returned';
+                    }
+                    else {
+                        dr2 = dr;
+                    }
+                    resolveVarsSet();
+                    return;
+                });
             });
             console.log('TWO');
-            // Sequence Job now scheduled (and could be already running)
-            let sjr = yield dr2.getResult();
-            console.log('THREE');
-            // Sequence job has been executed, return the value from the executed job
-            return sjr;
-            /* try{
-                
-                
-            } catch(err:any){
-                console.log(err);
-                return Promise.reject(err);
-            } */
+            if (haveError) {
+                return Promise.reject(error);
+            }
+            else {
+                // Sequence Job now scheduled (and could be already running)
+                let sjr = yield dr2.getResult();
+                console.log('THREE');
+                // Sequence job has been executed, return the value from the executed job
+                return sjr;
+            }
         });
     }
 }
