@@ -62,14 +62,17 @@ function getConnection(purpose, uuid) {
     return __awaiter(this, void 0, void 0, function* () {
         // prepare our return value (a client connection wrapped with error info)
         let retval = new GTS.DM.WrappedResult();
+        console.log('in getConnection');
         // try to get an alrady open client for the uuid
         let client = clientPool.openConnections[uuid];
         if (client) {
+            console.log('have already open connection');
             return retval.setData(client);
         } // provide the connection to the caller
         // Require that only one thread can be opening a connection at a time, others will be qued
         let dr = yield gts_concurrency_1.Concurrency.limitToOneAtATime('openDbConnection', function (uuid) {
             return __awaiter(this, void 0, void 0, function* () {
+                console.log('getConnection - in one at a time');
                 // when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
                 let c = clientPool.openConnections[uuid];
                 if (c) {

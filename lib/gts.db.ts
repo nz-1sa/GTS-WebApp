@@ -29,13 +29,15 @@ var clientPool:ClientPool = new ClientPool();
 export async function getConnection(purpose: string, uuid: string): Promise<GTS.DM.WrappedResult<Pg.PoolClient>>{
 	// prepare our return value (a client connection wrapped with error info)
 	let retval:GTS.DM.WrappedResult<Pg.PoolClient> = new GTS.DM.WrappedResult();
+	console.log('in getConnection');
 	
 	// try to get an alrady open client for the uuid
 	let client:Pg.PoolClient = clientPool.openConnections[uuid];
-	if(client){ return retval.setData(client); }								// provide the connection to the caller
+	if(client){ console.log('have already open connection'); return retval.setData(client); }								// provide the connection to the caller
 	
 	// Require that only one thread can be opening a connection at a time, others will be qued
 	let dr:DelayedResult<GTS.DM.WrappedResult<Pg.PoolClient>> = await Concurrency.limitToOneAtATime<GTS.DM.WrappedResult<Pg.PoolClient>>('openDbConnection', async function(uuid:string){
+		console.log('getConnection - in one at a time');
 		// when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
 		let c:Pg.PoolClient = clientPool.openConnections[uuid];	
 		if(c){ console.log('have connection for uuid'); return new GTS.DM.WrappedResult().setData(c); }	// provide the connection to variable connResult
