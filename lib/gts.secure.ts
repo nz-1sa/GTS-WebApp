@@ -543,6 +543,7 @@ export class Session{
 	}
 	
 	static async hasSession(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>): Promise<[boolean,Session?]>{
+		console.log({uuid:uuid, requestIp:requestIp, cookies:cookies});
 		if(!cookies['session']){ console.log('no session cookie at hasSession check'); return [false,undefined]; }
 		if(cookies['session'].length != 36){ console.log('incorrect session length at hasSession check'); return [false,undefined]; }
 		let ws:GTS.DM.WrappedResult<Session> = await Session.getSessionFromDB(uuid, cookies['session']);
