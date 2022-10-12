@@ -240,7 +240,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         // by getting to here there is a logged in session
         let doLogSequenceCheck = true;
         let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
-        yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, parseInt(sequence), function (purpose, seqNum) {
+        yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, parseInt(sequence), function (purpose, seqNum, dbId) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);
                 console.log({ pass: sess.password, nonce: sess.nonce + seqNum });
@@ -249,14 +249,14 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                 const [action, params] = JSON.parse(decoded);
                 console.log({ action: action, params: params });
                 if (!web.adminHandlers[action]) {
-                    return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${uuid} Missing admin action {action}`, `""`, []);
+                    return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${dbId} Missing admin action {action}`, `""`, []);
                 }
-                let adminResp = yield web.adminHandlers[action](uuid, requestIp, cookies, params);
+                let adminResp = yield web.adminHandlers[action](dbId, requestIp, cookies, params);
                 console.log('admin response is');
                 console.log(adminResp);
                 return adminResp;
             });
-        }, Session.checkAndIncrementSequenceInDB)
+        }, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])
             .then((adminResponse) => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), sess.password, (sess.nonce + parseInt(sequence)))}"`, []); })
             .catch((err) => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`, '', []); });
         console.log('retval is');

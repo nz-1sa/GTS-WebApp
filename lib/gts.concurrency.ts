@@ -313,7 +313,7 @@ export class Concurrency{
 
 	private static sequencedJobsWaiting: GTS.DM.HashTable<GTS.DM.HashTable<Function>> = {};
 
-	static async doSequencedJob<T>(purpose:string, sequence:number, action:Function, seqCheckAndIncr?:Function):Promise<T>{
+	static async doSequencedJob<T>(purpose:string, sequence:number, action:Function, actionArgs?:any[], seqCheckAndIncr?:Function, seqCheckArgs?:any[]):Promise<T>{
 		// default to in memory sequence checking if no function provided
 		if(seqCheckAndIncr==undefined){
 			seqCheckAndIncr = Concurrency.inMemorySequenceTracking;
@@ -324,9 +324,9 @@ export class Concurrency{
 		await new Promise<void>(async function(resolveOneAtATimeAccessScheduled){
 			drSyncSchedule = await Concurrency.limitToOneAtATime<DelayedResult<T>>(
 				purpose,		// que identifier (can have multiple ques run in parallel)
-				async function(purp:string, seq:number, act:Function):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
+				async function(purp:string, seq:number, act:Function, actArgs:any[], sqChkIncr:Function, sqChkIncrArgs:any[]):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
-					let seqCheck:GTS.DM.WrappedResult<string> = await seqCheckAndIncr!(purp,seq);
+					let seqCheck:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
 					// wrapped result
 					console.log({seqCheck:seqCheck.data});
 					switch(seqCheck.data){
@@ -337,7 +337,7 @@ export class Concurrency{
 							var drNow:DelayedResult<string>;
 							await new Promise<void>(async function(varsSet:Function){
 								[fDoResolveNow,drNow] = await DelayedResult.createDelayedResult<string>(async function(resolve:Function):Promise<void>{
-									resolve(act(purp,seq));
+									resolve(act(purp,seq, ...actArgs));
 								});
 								varsSet();
 							})
@@ -345,7 +345,7 @@ export class Concurrency{
 							fDoResolveNow!();	// asynchronously start the job
 							// resolve any scheduled jobs that are ready to do
 							while(Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)){
-								let r:string = await seqCheckAndIncr!(purp,seq);
+								let r:string = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
 								if(r=="RunNow"){
 									let f:Function = Concurrency.sequencedJobsWaiting[purp][seq];
 									f();
@@ -359,7 +359,7 @@ export class Concurrency{
 							var drSoon:DelayedResult<string>;
 							await new Promise<void>(async function(varsSet:Function){
 								[fDoResolveSoon,drSoon] = await DelayedResult.createDelayedResult<string>(async function(resolve:Function):Promise<void>{
-									resolve(act(purp,seq));
+									resolve(act(purp,seq,...actArgs));
 								});
 								varsSet();
 							})
@@ -375,7 +375,7 @@ export class Concurrency{
 					}
 					
 				},
-				purpose, sequence, action	// parameters to the function that is run
+				purpose, sequence, action, actionArgs??[], seqCheckAndIncr, seqCheckArgs??[]		// parameters to the function that is run
 			);
 			resolveOneAtATimeAccessScheduled();
 		});

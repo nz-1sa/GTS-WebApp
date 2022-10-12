@@ -214,7 +214,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, parseInt(sequence), async function(purpose:string, seqNum:number){ // uuid:string as paramto async func,  'talkSession'+ id for purpose
+	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, parseInt(sequence), async function(purpose:string, seqNum:number, dbId:string){ // uuid:string as paramto async func,  'talkSession'+ id for purpose
 		console.log('talking at number #'+seqNum);
 		console.log({pass:sess.password, nonce:sess.nonce+seqNum});
 		
@@ -224,17 +224,17 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 		console.log({action:action, params:params});
 		
 		if(!web.adminHandlers[action]){
-			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${uuid} Missing admin action {action}`,`""`,[]);
+			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${dbId} Missing admin action {action}`,`""`,[]);
 		}
 		
-		let adminResp:WS.WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, params);
+		let adminResp:WS.WebResponse = await web.adminHandlers[action](dbId, requestIp, cookies, params);
 		console.log('admin response is');
 		console.log(adminResp);
 		
 		return adminResp;
 		
 		
-	}, Session.checkAndIncrementSequenceInDB)
+	}, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])
 		.then((adminResponse:WS.WebResponse) => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
 		.catch((err:any) => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. {err}`,'', []);} );
 	console.log('retval is');

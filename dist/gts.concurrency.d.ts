@@ -28,6 +28,6 @@ export declare class Concurrency {
     private static expectedSequenceLookup;
     static inMemorySequenceTracking(purpose: string, sequence: number): GTS.DM.WrappedResult<string>;
     private static sequencedJobsWaiting;
-    static doSequencedJob<T>(purpose: string, sequence: number, action: Function, seqCheckAndIncr?: Function): Promise<T>;
+    static doSequencedJob<T>(purpose: string, sequence: number, action: Function, actionArgs?: any[], seqCheckAndIncr?: Function, seqCheckArgs?: any[]): Promise<T>;
 }
 export {};

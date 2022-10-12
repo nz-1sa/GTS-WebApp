@@ -338,7 +338,7 @@ class Concurrency {
         // return "Invalid" if the sequence is already run or is too far in the future
         return retval.setData("Invalid");
     }
-    static doSequencedJob(purpose, sequence, action, seqCheckAndIncr) {
+    static doSequencedJob(purpose, sequence, action, actionArgs, seqCheckAndIncr, seqCheckArgs) {
         return __awaiter(this, void 0, void 0, function* () {
             // default to in memory sequence checking if no function provided
             if (seqCheckAndIncr == undefined) {
@@ -349,12 +349,12 @@ class Concurrency {
             yield new Promise(function (resolveOneAtATimeAccessScheduled) {
                 return __awaiter(this, void 0, void 0, function* () {
                     drSyncSchedule = yield Concurrency.limitToOneAtATime(purpose, // que identifier (can have multiple ques run in parallel)
-                    function (purp, seq, act) {
+                    function (purp, seq, act, actArgs, sqChkIncr, sqChkIncrArgs) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (!Concurrency.sequencedJobsWaiting[purp]) {
                                 Concurrency.sequencedJobsWaiting[purp] = {};
                             }
-                            let seqCheck = yield seqCheckAndIncr(purp, seq);
+                            let seqCheck = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                             // wrapped result
                             console.log({ seqCheck: seqCheck.data });
                             switch (seqCheck.data) {
@@ -367,7 +367,7 @@ class Concurrency {
                                         return __awaiter(this, void 0, void 0, function* () {
                                             [fDoResolveNow, drNow] = yield DelayedResult.createDelayedResult(function (resolve) {
                                                 return __awaiter(this, void 0, void 0, function* () {
-                                                    resolve(act(purp, seq));
+                                                    resolve(act(purp, seq, ...actArgs));
                                                 });
                                             });
                                             varsSet();
@@ -377,7 +377,7 @@ class Concurrency {
                                     fDoResolveNow(); // asynchronously start the job
                                     // resolve any scheduled jobs that are ready to do
                                     while (Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)) {
-                                        let r = yield seqCheckAndIncr(purp, seq);
+                                        let r = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                                         if (r == "RunNow") {
                                             let f = Concurrency.sequencedJobsWaiting[purp][seq];
                                             f();
@@ -393,7 +393,7 @@ class Concurrency {
                                         return __awaiter(this, void 0, void 0, function* () {
                                             [fDoResolveSoon, drSoon] = yield DelayedResult.createDelayedResult(function (resolve) {
                                                 return __awaiter(this, void 0, void 0, function* () {
-                                                    resolve(act(purp, seq));
+                                                    resolve(act(purp, seq, ...actArgs));
                                                 });
                                             });
                                             varsSet();
@@ -410,7 +410,7 @@ class Concurrency {
                                     return Promise.reject("Unknown Result of Sequence Check.");
                             }
                         });
-                    }, purpose, sequence, action // parameters to the function that is run
+                    }, purpose, sequence, action, actionArgs !== null && actionArgs !== void 0 ? actionArgs : [], seqCheckAndIncr, seqCheckArgs !== null && seqCheckArgs !== void 0 ? seqCheckArgs : [] // parameters to the function that is run
                     );
                     resolveOneAtATimeAccessScheduled();
                 });
