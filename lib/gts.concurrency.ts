@@ -90,7 +90,7 @@ export class Concurrency{
 			// set that this job is the job to be done
 			Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
 				// do the job resolving the value being awaited on
-				async function(){resolve( await fn(...args) );}
+				async function(){resolve( await fn(...args).catch((err:any)=>{console.log(err);}) );}
 			);
 		});
 		f();				// call the function to the job
