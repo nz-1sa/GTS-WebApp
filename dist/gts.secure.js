@@ -262,7 +262,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             .catch((err) => {
             let errMsg = '';
             if (err.startsWith('Seq Check Error')) {
-                errMsg = 'Seq Check Error';
+                errMsg = 'ERROR: Seq Check Error';
             }
             else {
                 errMsg = 'Secure Talk Error';

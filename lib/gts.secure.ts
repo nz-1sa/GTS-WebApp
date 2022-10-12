@@ -239,7 +239,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 		.then((adminResponse:WS.WebResponse) => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
 		.catch((err:any) => {
 			let errMsg:string = '';
-			if((err as string).startsWith('Seq Check Error')){ errMsg = 'Seq Check Error'; } else { errMsg = 'Secure Talk Error'; }
+			if((err as string).startsWith('Seq Check Error')){ errMsg = 'ERROR: Seq Check Error'; } else { errMsg = 'Secure Talk Error'; }
 			retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`,'', []);
 		} );
 		
