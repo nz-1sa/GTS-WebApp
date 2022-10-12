@@ -3,7 +3,7 @@ import * as GTS from "./gts";
 
 // Holds a promise that is resolved when a delay is completed, and a timeout that can clear/cancel the delay
 class CancellableDelay{
-	timeout:number;	// the timeout from a window.setTimeout (clear to cancel)
+	timeout:number;	// the timeout from a global.setTimeout (clear to cancel)
 	promise:Promise<void>;	// the promise that is resolved the the setTimout finishes
 	constructor(pTimeout:number, pPromise:Promise<void>){
 		this.timeout = pTimeout;
@@ -104,11 +104,11 @@ export class Concurrency{
 	// start waiting for a pause that can be cancelled
 	public static async startCancellableDelay(ms:number):Promise<CancellableDelay>{
 		// ability to cancel the timeout, init to a dummy value to allow code to compile
-		let delayTimeout:number = window.setTimeout(()=>null,1);
+		let delayTimeout:number = 0; //global.setTimeout(()=>null,1);
 		
 		var f:Function; var dr:DelayedResult<any>;
 		[f,dr] = await DelayedResult.createDelayedResult<void>(async function(resolve:Function):Promise<void>{
-			delayTimeout = window.setTimeout(resolve, ms);
+			delayTimeout = global.setTimeout(resolve, ms);
 		});
 		f();		// call the function to start the timeout
 		return new CancellableDelay(delayTimeout, dr.getResult());	
@@ -157,7 +157,7 @@ export class Concurrency{
 			let res:T = await action();
 			if(!funcOver){
 				funcOver = true;
-				window.clearTimeout(ourTimeout);					// stop the timeout if the job finishes first
+				global.clearTimeout(ourTimeout);					// stop the timeout if the job finishes first
 				promiseDoneOrTimedout([res,false]);			// resolves promise with the result of the action, false for not timeout
 				return;
 			}

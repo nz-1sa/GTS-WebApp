@@ -104,12 +104,12 @@ class Concurrency {
     static startCancellableDelay(ms) {
         return __awaiter(this, void 0, void 0, function* () {
             // ability to cancel the timeout, init to a dummy value to allow code to compile
-            let delayTimeout = window.setTimeout(() => null, 1);
+            let delayTimeout = 0; //global.setTimeout(()=>null,1);
             var f;
             var dr;
             [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    delayTimeout = window.setTimeout(resolve, ms);
+                    delayTimeout = global.setTimeout(resolve, ms);
                 });
             });
             f(); // call the function to start the timeout
@@ -159,7 +159,7 @@ class Concurrency {
                     let res = yield action();
                     if (!funcOver) {
                         funcOver = true;
-                        window.clearTimeout(ourTimeout); // stop the timeout if the job finishes first
+                        global.clearTimeout(ourTimeout); // stop the timeout if the job finishes first
                         promiseDoneOrTimedout([res, false]); // resolves promise with the result of the action, false for not timeout
                         return;
                     }
