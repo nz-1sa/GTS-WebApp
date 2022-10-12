@@ -105,18 +105,26 @@ class Concurrency {
             ;
             var f;
             var dr;
-            [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
+            var errMsg = '';
+            yield new Promise(function (resolveVarsSet) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    // wait for other jobs that are scheduled to be done first
-                    yield Concurrency.limitOneAtATimePromises[purpose];
-                    // set that this job is the job to be done
-                    Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
-                    // do the job resolving the value being awaited on
-                    function () {
-                        return __awaiter(this, void 0, void 0, function* () { resolve(yield fn(...args).catch((err) => { console.log(err); })); });
+                    [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            // wait for other jobs that are scheduled to be done first
+                            yield Concurrency.limitOneAtATimePromises[purpose];
+                            // set that this job is the job to be done
+                            Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
+                            // do the job resolving the value being awaited on
+                            function () {
+                                return __awaiter(this, void 0, void 0, function* () { resolve(yield fn(...args).catch((err) => { console.log(err); errMsg = 'ERROR:' + err; }).then(function () { resolveVarsSet(); })); });
+                            });
+                        });
                     });
                 });
             });
+            if (errMsg.length > 0) {
+                return Promise.reject(errMsg);
+            }
             f(); // call the function to the job
             return dr; // return object wrapper of promise to wait for the job to be done
         });

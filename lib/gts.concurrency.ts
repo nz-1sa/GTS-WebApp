@@ -83,18 +83,23 @@ export class Concurrency{
 		// ensure there is a promise defined for the specified purpose (used to limit execution to one at a time within purpose)
 		if(!Concurrency.limitOneAtATimePromises[purpose]){Concurrency.limitOneAtATimePromises[purpose]=Promise.resolve();};
 
-		var f:Function; var dr:DelayedResult<any>;
-		[f,dr] = await DelayedResult.createDelayedResult<any>(async function(resolve:Function):Promise<any>{
-			// wait for other jobs that are scheduled to be done first
-			await Concurrency.limitOneAtATimePromises[purpose];
-			// set that this job is the job to be done
-			Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
-				// do the job resolving the value being awaited on
-				async function(){resolve( await fn(...args).catch((err:any)=>{console.log(err);}) );}
-			);
+		var f:Function; var dr:DelayedResult<any>; var errMsg:string = '';
+		await new Promise<void>(async function(resolveVarsSet:Function){
+			[f,dr] = await DelayedResult.createDelayedResult<any>(async function(resolve:Function):Promise<any>{
+				// wait for other jobs that are scheduled to be done first
+				await Concurrency.limitOneAtATimePromises[purpose];
+				// set that this job is the job to be done
+				Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
+					// do the job resolving the value being awaited on
+					async function(){resolve( await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then(function(){resolveVarsSet();}) );}
+				);
+			});
 		});
-		f();				// call the function to the job
-		return dr;		// return object wrapper of promise to wait for the job to be done
+		if(errMsg.length > 0){
+			return Promise.reject(errMsg);
+		}
+		f!();				// call the function to the job
+		return dr!;		// return object wrapper of promise to wait for the job to be done
 	}
 
 	// -----------------
