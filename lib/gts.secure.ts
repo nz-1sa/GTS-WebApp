@@ -237,7 +237,11 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	}, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])
 		// WS.WebResponse(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string, pSetCookies?: Cookie[])
 		.then((adminResponse:WS.WebResponse) => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
-		.catch((err:any) => {retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. ${err}`,'', []);} );
+		.catch((err:any) => {
+			let errMsg:string = '';
+			if((err as string).startsWith('Seq Check Error')){ errMsg = 'Seq Check Error'; } else { errMsg = 'Secure Talk Error'; }
+			retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`,'', []);
+		} );
 		
 	console.log('retval for secureTalk is '+retval.toString());
 	return retval;

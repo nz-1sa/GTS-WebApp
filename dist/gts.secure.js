@@ -259,7 +259,16 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         }, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])
             // WS.WebResponse(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string, pSetCookies?: Cookie[])
             .then((adminResponse) => { retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(), sess.password, (sess.nonce + parseInt(sequence)))}"`, []); })
-            .catch((err) => { retval = new WS.WebResponse(false, "ERROR: Sequence Start Failed.", `UUID:${uuid} ERROR: Sequence Start Failed. ${err}`, '', []); });
+            .catch((err) => {
+            let errMsg = '';
+            if (err.startsWith('Seq Check Error')) {
+                errMsg = 'Seq Check Error';
+            }
+            else {
+                errMsg = 'Secure Talk Error';
+            }
+            retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`, '', []);
+        });
         console.log('retval for secureTalk is ' + retval.toString());
         return retval;
     });
