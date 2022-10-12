@@ -98,16 +98,20 @@ class Concurrency {
     // for a given purpose, limit concurrency to one at a time
     static limitToOneAtATime(purpose, fn, ...args) {
         return __awaiter(this, void 0, void 0, function* () {
+            console.log('in limitToOneAtATime');
+            console.log({ purpose: purpose, fn: fn, args: args });
             // ensure there is a promise defined for the specified purpose (used to limit execution to one at a time within purpose)
             if (!Concurrency.limitOneAtATimePromises[purpose]) {
                 Concurrency.limitOneAtATimePromises[purpose] = Promise.resolve();
             }
             ;
+            console.log('storeage defined');
             var f;
             var dr;
             var errMsg = '';
             yield new Promise(function (resolveVarsSet) {
                 return __awaiter(this, void 0, void 0, function* () {
+                    console.log('creating delayedResult');
                     [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
                         return __awaiter(this, void 0, void 0, function* () {
                             // wait for other jobs that are scheduled to be done first
@@ -122,10 +126,14 @@ class Concurrency {
                     });
                 });
             });
+            console.log('delayed result made');
             if (errMsg.length > 0) {
+                console.log('error is ' + errMsg);
                 return Promise.reject(errMsg);
             }
+            console.log('calling job');
             f(); // call the function to the job
+            console.log('returning promise for job');
             return dr; // return object wrapper of promise to wait for the job to be done
         });
     }

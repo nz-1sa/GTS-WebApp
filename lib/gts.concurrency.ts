@@ -80,11 +80,15 @@ export class Concurrency{
 	
 	// for a given purpose, limit concurrency to one at a time
 	public static async limitToOneAtATime<T>(purpose:string, fn:Function, ...args:any[]):Promise<DelayedResult<T>>{
+		console.log('in limitToOneAtATime');
+		console.log({purpose:purpose, fn:fn, args:args});
 		// ensure there is a promise defined for the specified purpose (used to limit execution to one at a time within purpose)
 		if(!Concurrency.limitOneAtATimePromises[purpose]){Concurrency.limitOneAtATimePromises[purpose]=Promise.resolve();};
+		console.log('storeage defined');
 
 		var f:Function; var dr:DelayedResult<any>; var errMsg:string = '';
 		await new Promise<void>(async function(resolveVarsSet:Function){
+			console.log('creating delayedResult');
 			[f,dr] = await DelayedResult.createDelayedResult<any>(async function(resolve:Function):Promise<any>{
 				// wait for other jobs that are scheduled to be done first
 				await Concurrency.limitOneAtATimePromises[purpose];
@@ -95,10 +99,14 @@ export class Concurrency{
 				);
 			});
 		});
+		console.log('delayed result made');
 		if(errMsg.length > 0){
+			console.log('error is '+errMsg);
 			return Promise.reject(errMsg);
 		}
+		console.log('calling job');
 		f!();				// call the function to the job
+		console.log('returning promise for job');
 		return dr!;		// return object wrapper of promise to wait for the job to be done
 	}
 
