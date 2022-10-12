@@ -91,11 +91,13 @@ export class Concurrency{
 			console.log('creating delayedResult');
 			[f,dr] = await DelayedResult.createDelayedResult<any>(async function(resolve:Function):Promise<any>{
 				// wait for other jobs that are scheduled to be done first
+				console.log('waiting for earlier jobs to be completed');
 				await Concurrency.limitOneAtATimePromises[purpose];
 				// set that this job is the job to be done
+				console.log('setting our job to be done');
 				Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
 					// do the job resolving the value being awaited on
-					async function(){resolve( await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then(function(){resolveVarsSet();}) );}
+					async function(){let val:any = await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then((val:any)=>{resolve(val); resolveVarsSet();});}
 				);
 			});
 		});

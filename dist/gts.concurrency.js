@@ -115,12 +115,14 @@ class Concurrency {
                     [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
                         return __awaiter(this, void 0, void 0, function* () {
                             // wait for other jobs that are scheduled to be done first
+                            console.log('waiting for earlier jobs to be completed');
                             yield Concurrency.limitOneAtATimePromises[purpose];
                             // set that this job is the job to be done
+                            console.log('setting our job to be done');
                             Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
                             // do the job resolving the value being awaited on
                             function () {
-                                return __awaiter(this, void 0, void 0, function* () { resolve(yield fn(...args).catch((err) => { console.log(err); errMsg = 'ERROR:' + err; }).then(function () { resolveVarsSet(); })); });
+                                return __awaiter(this, void 0, void 0, function* () { let val = yield fn(...args).catch((err) => { console.log(err); errMsg = 'ERROR:' + err; }).then((val) => { resolve(val); resolveVarsSet(); }); });
                             });
                         });
                     });
