@@ -65,6 +65,12 @@ function attachWebInterface(web, webapp) {
             return yield handleLogoutRequest(uuid, requestIp, cookies, challenge);
         });
     });
+    // get current talk sequence for account
+    web.registerHandlerUnchecked(webapp, '/api/curSeq', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield handleSequenceRequest(uuid, requestIp, cookies, challenge);
+        });
+    });
     //NOTE: requests to the server must be received in sequence. Message is encrypted
     web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -206,12 +212,53 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         }
         sess.status = SessionStatus.LoggedOut;
         sess.updateDB(uuid);
-        // encrypt and return to client the password to use for the session, and the nonce to start with
+        // encrypt and return to client the current time to allow checking for valid response
         let plainTextResponse = new Date().getTime().toString();
         console.log({ plainTextResponse: plainTextResponse });
         let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
         console.log({ encResponse: encResponse });
         return new WS.WebResponse(true, "", `UUID:${uuid} Logout success`, `"${encResponse}"`);
+    });
+}
+function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log('handleSequenceRequest');
+        // check that there is an open session to request sequence for
+        const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+        if (!hs || !s) {
+            return new WS.WebResponse(false, "ERROR: A session needs to be started to have a seqeunce.", `UUID:${uuid} curSeq called before startSession`, '', []);
+        }
+        let sess = s;
+        if (sess.ip != requestIp) {
+            return new WS.WebResponse(false, "ERROR: Can only get session from logged in IP", `UUID:${uuid} curSeq called from wrong IP.`, '', []);
+        }
+        if (sess.status != SessionStatus.LoggedIn) {
+            return new WS.WebResponse(false, "ERROR: Can only get session after loggin in", `UUID:${uuid} curSeq called before login.`, '', []);
+        }
+        // decrypt challenge using session password and 0 for sequence (cant expect them to know the sequence if calling curSeq)
+        let decoded = Encodec.decrypt(challenge, sess.password, 0);
+        if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
+            console.log('failed regex check');
+            return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, decoded content failed regex check.`, '', []);
+        }
+        // verify decrypted challenge content
+        if (parseInt(decoded) == NaN) {
+            console.log('failed NaN check');
+            return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, invalid decoded content.`, '', []);
+        }
+        let now = new Date().getTime();
+        let timeDiff = now - parseInt(decoded);
+        console.log({ now: now, timeDiff: timeDiff });
+        if (timeDiff < 0 || timeDiff > 20000) { // request must arrive within 20 seconds
+            console.log('failed Date check');
+            return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, request to old.`, '', []);
+        }
+        // encrypt and return to client the current sequence to use for talking, and a date check of the response
+        let plainTextResponse = JSON.stringify({ when: new Date().getTime().toString(), seq: sess.seq.toString() });
+        console.log({ plainTextResponse: plainTextResponse });
+        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
+        console.log({ encResponse: encResponse });
+        return new WS.WebResponse(true, "", `UUID:${uuid} curSeq success`, `"${encResponse}"`);
     });
 }
 // secure talk within a session
