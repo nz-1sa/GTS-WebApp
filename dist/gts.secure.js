@@ -47,32 +47,32 @@ function attachWebInterface(web, webapp) {
     // serve login page from project root
     webapp.get('/login', (req, res) => res.sendFile(web.getFile('login.html')));
     // a captcha is shown as part of starting a session
-    web.registerHandlerUnchecked(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
+    web.registerHandlerGet(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleStartSessionRequest(uuid, requestIp, cookies);
         });
     });
     // login by email, password, and captcha
     //TODO: email should be SHA1 hash
-    web.registerHandlerUnchecked(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
+    web.registerHandlerPost(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleLoginRequest(uuid, requestIp, cookies, email, challenge);
         });
     });
     // log out of account
-    web.registerHandlerUnchecked(webapp, '/api/logout', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+    web.registerHandlerPost(webapp, '/api/logout', ['challenge'], function (uuid, requestIp, cookies, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleLogoutRequest(uuid, requestIp, cookies, challenge);
         });
     });
     // get current talk sequence for account
-    web.registerHandlerUnchecked(webapp, '/api/curSeq', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+    web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], function (uuid, requestIp, cookies, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleSequenceRequest(uuid, requestIp, cookies, challenge);
         });
     });
     //NOTE: requests to the server must be received in sequence. Message is encrypted
-    web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
+    web.registerHandlerPost(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
         });
@@ -691,7 +691,7 @@ class Session {
         const encoder = new GIFEncoder(imgWidth, imgHeight);
         encoder.start();
         encoder.setRepeat(0); // 0 for repeat, -1 for no-repeat
-        encoder.setDelay(2000); // frame delay in ms
+        encoder.setDelay(1000); // frame delay in ms
         encoder.setQuality(10); // image quality. 10 is default.
         // use node-canvas to draw each frame
         const canvas = createCanvas(imgWidth, imgHeight);

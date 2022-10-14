@@ -18,28 +18,28 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
 	// a captcha is shown as part of starting a session
-	web.registerHandlerUnchecked(webapp, '/api/startSession', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+	web.registerHandlerGet(webapp, '/api/startSession', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
 		return await handleStartSessionRequest(uuid, requestIp, cookies);
 	});
 	
 	// login by email, password, and captcha
 	//TODO: email should be SHA1 hash
-	web.registerHandlerUnchecked(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
+	web.registerHandlerPost(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
 		return await handleLoginRequest(uuid, requestIp, cookies, email, challenge);
 	});
 	
 	// log out of account
-	web.registerHandlerUnchecked(webapp, '/api/logout', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
+	web.registerHandlerPost(webapp, '/api/logout', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
 		return await handleLogoutRequest(uuid, requestIp, cookies, challenge);
 	});
 	
 	// get current talk sequence for account
-	web.registerHandlerUnchecked(webapp, '/api/curSeq', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
+	web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
 		return await handleSequenceRequest(uuid, requestIp, cookies, challenge);
 	});
 	
 	//NOTE: requests to the server must be received in sequence. Message is encrypted
-	web.registerHandlerUnchecked(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+	web.registerHandlerPost(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
 		return await handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
 	});
 }
@@ -565,7 +565,7 @@ export class Session{
 		const encoder = new GIFEncoder(imgWidth, imgHeight);
 		encoder.start();
 		encoder.setRepeat(0);   // 0 for repeat, -1 for no-repeat
-		encoder.setDelay(2000);  // frame delay in ms
+		encoder.setDelay(1000);  // frame delay in ms
 		encoder.setQuality(10); // image quality. 10 is default.
 
 		// use node-canvas to draw each frame

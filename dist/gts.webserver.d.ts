@@ -9,7 +9,8 @@ export declare class WebServerHelper {
     constructor(pSiteRoot: string);
     getFile(fileName: string): string;
     registerHandler(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
-    registerHandlerUnchecked(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    registerHandlerPost(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
+    registerHandlerGet(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
     adminHandlers: GTS.DM.HashTable<IAdminHandlerFunction>;
     registerAdminHandler(action: string, work: IAdminHandlerFunction): Promise<void>;
     private getUUID;
