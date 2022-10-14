@@ -37,7 +37,7 @@ export class WebServerHelper{
 	
 	// register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do. Params are not checked
 	public async registerHandlerUnchecked(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
-		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
+		webapp.post(url, async (req:Express.Request, res:Express.Response) =>{
 			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
 		});
 	}
