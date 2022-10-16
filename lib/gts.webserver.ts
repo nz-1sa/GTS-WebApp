@@ -38,13 +38,13 @@ export class WebServerHelper{
 	// register how to hanle a web request; the url to listen on, required parameters to be sent, and the function to do. Params are not checked
 	public async registerHandlerPost(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
 		webapp.post(url, async (req:Express.Request, res:Express.Response) =>{
-			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
+			await this.handleRequestPost(req, res, url, requiredParams, work);
 		});
 	}
 	
 	public async registerHandlerGet(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
 		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
-			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
+			await this.handleRequestGet(req, res, url, requiredParams, work);
 		});
 	}
 	
@@ -179,7 +179,15 @@ export class WebServerHelper{
 		}
 	}
 	
-	private async handleRequestUnchecked(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
+	private async handleRequestGet(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
+		return this.handleRequestUnchecked(req, res, requestUrl, requiredParams, work, false);
+	}
+	
+	private async handleRequestPost(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function):Promise<void>{
+		return this.handleRequestUnchecked(req, res, requestUrl, requiredParams, work, true);
+	}
+	
+	private async handleRequestUnchecked(req:Express.Request, res:Express.Response, requestUrl:string, requiredParams:string[], work:Function, isPost:boolean):Promise<void>{
 		let timeStart:number = new Date().getTime();
 		var response:WebResponse = new WebResponse(false,'', 'Only Initialised','');
 		
@@ -200,11 +208,20 @@ export class WebServerHelper{
 			let paramVals:string[] = [];
 			for(var i:number=0;i<requiredParams.length;i++){
 				let name:string = requiredParams[i];
-				if(req.query[name] === undefined){
-					res.send( new WebResponse(false, `Missing ${name} param`,'','').toString() );
-					return;
+				let val:string = '';
+				if(isPost){
+					if(req.body[name] === undefined){
+						res.send( new WebResponse(false, `Missing ${name} post data`,'','').toString() );
+						return;
+					}
+					val = req.body[name]!.toString();
+				} else {
+					if(req.query[name] === undefined){
+						res.send( new WebResponse(false, `Missing ${name} param`,'','').toString() );
+						return;
+					}
+					val = req.query[name]!.toString();
 				}
-				let val:string = req.query[name]!.toString();
 				paramVals.push(val);
 				logParams.push(`${name}=${val}`);
 			}

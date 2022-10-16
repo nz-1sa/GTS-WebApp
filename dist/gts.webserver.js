@@ -62,14 +62,14 @@ class WebServerHelper {
     registerHandlerPost(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
             webapp.post(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
+                yield this.handleRequestPost(req, res, url, requiredParams, work);
             }));
         });
     }
     registerHandlerGet(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
             webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
-                yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
+                yield this.handleRequestGet(req, res, url, requiredParams, work);
             }));
         });
     }
@@ -216,7 +216,17 @@ class WebServerHelper {
             }
         });
     }
-    handleRequestUnchecked(req, res, requestUrl, requiredParams, work) {
+    handleRequestGet(req, res, requestUrl, requiredParams, work) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.handleRequestUnchecked(req, res, requestUrl, requiredParams, work, false);
+        });
+    }
+    handleRequestPost(req, res, requestUrl, requiredParams, work) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.handleRequestUnchecked(req, res, requestUrl, requiredParams, work, true);
+        });
+    }
+    handleRequestUnchecked(req, res, requestUrl, requiredParams, work, isPost) {
         return __awaiter(this, void 0, void 0, function* () {
             let timeStart = new Date().getTime();
             var response = new WebResponse(false, '', 'Only Initialised', '');
@@ -235,11 +245,21 @@ class WebServerHelper {
                 let paramVals = [];
                 for (var i = 0; i < requiredParams.length; i++) {
                     let name = requiredParams[i];
-                    if (req.query[name] === undefined) {
-                        res.send(new WebResponse(false, `Missing ${name} param`, '', '').toString());
-                        return;
+                    let val = '';
+                    if (isPost) {
+                        if (req.body[name] === undefined) {
+                            res.send(new WebResponse(false, `Missing ${name} post data`, '', '').toString());
+                            return;
+                        }
+                        val = req.body[name].toString();
                     }
-                    let val = req.query[name].toString();
+                    else {
+                        if (req.query[name] === undefined) {
+                            res.send(new WebResponse(false, `Missing ${name} param`, '', '').toString());
+                            return;
+                        }
+                        val = req.query[name].toString();
+                    }
                     paramVals.push(val);
                     logParams.push(`${name}=${val}`);
                 }

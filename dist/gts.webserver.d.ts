@@ -16,6 +16,8 @@ export declare class WebServerHelper {
     private getUUID;
     private releaseUUID;
     private handleRequest;
+    private handleRequestGet;
+    private handleRequestPost;
     private handleRequestUnchecked;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
     private requireTransactionHash;
