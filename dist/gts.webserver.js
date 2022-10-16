@@ -68,7 +68,7 @@ class WebServerHelper {
     }
     registerHandlerGet(webapp, url, requiredParams, work) {
         return __awaiter(this, void 0, void 0, function* () {
-            webapp.post(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
+            webapp.get(url, (req, res) => __awaiter(this, void 0, void 0, function* () {
                 yield this.handleRequestUnchecked(req, res, url, requiredParams, work);
             }));
         });

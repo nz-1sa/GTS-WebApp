@@ -43,7 +43,7 @@ export class WebServerHelper{
 	}
 	
 	public async registerHandlerGet(webapp:Express.Application, url:string, requiredParams:string[], work:Function):Promise<void>{
-		webapp.post(url, async (req:Express.Request, res:Express.Response) =>{
+		webapp.get(url, async (req:Express.Request, res:Express.Response) =>{
 			await this.handleRequestUnchecked(req, res, url, requiredParams, work);
 		});
 	}
