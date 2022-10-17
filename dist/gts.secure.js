@@ -170,7 +170,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
         sess.updateDB(uuid);
         console.log({ sess: sess });
         // encrypt and return to client the password to use for the session, and the nonce to start with
-        let plainTextResponse = JSON.stringify({ pass: sess.password, nonce: sess.nonce });
+        let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ pass: sess.password, nonce: sess.nonce });
         console.log({ plainTextResponse: plainTextResponse });
         let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
         console.log({ encResponse: encResponse });
@@ -254,8 +254,8 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
             return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, request to old.`, '', []);
         }
         // encrypt and return to client the current sequence to use for talking, and a date check of the response
-        let plainTextResponse = JSON.stringify({ when: new Date().getTime().toString(), seq: sess.seq.toString() });
-        console.log({ plainTextResponse: plainTextResponse });
+        let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ seq: sess.seq.toString() });
+        //console.log({plainTextResponse:plainTextResponse});
         let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
         console.log({ encResponse: encResponse });
         return new WS.WebResponse(true, "", `UUID:${uuid} curSeq success`, `"${encResponse}"`);
