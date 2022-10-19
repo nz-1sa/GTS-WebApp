@@ -258,11 +258,18 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	if(!new RegExp("^[0-9]+$", "g").test(sequence)){
 		return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence fails regex check`,'', []);
 	}
+	let iSequence:number = parseInt(sequence);
+	if(iSequence < s.seq){
+		return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence is less than expected session sequence`,'', []);
+	}
+	if(iSequence > s.seq+10){
+		return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence is too large (10+ expected)`,'', []);
+	}
 	
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, parseInt(sequence), async function(purpose:string, seqNum:number, dbId:string){ // uuid:string as paramto async func,  'talkSession'+ id for purpose
+	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, iSequence, async function(purpose:string, seqNum:number, dbId:string){ // uuid:string as paramto async func,  'talkSession'+ id for purpose
 		console.log('talking at number #'+seqNum);
 		console.log({pass:sess.password, nonce:sess.nonce+seqNum});
 		
@@ -284,7 +291,10 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 		
 	}, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])
 		// WS.WebResponse(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string, pSetCookies?: Cookie[])
-		.then((adminResponse:WS.WebResponse) => {retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(adminResponse.toString(),sess.password, (sess.nonce+parseInt(sequence)))}"`, []);} )
+		.then((adminResponse:WS.WebResponse) => {
+			let plainTextResponse =  new Date().getTime().toString()+adminResponse.toString();
+			retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(plainTextResponse,sess.password, (sess.nonce+iSequence))}"`, []);
+		} )
 		.catch((err:any) => {
 			let errMsg:string = '';
 			if((err as string).startsWith('Seq Check Error')){ errMsg = 'ERROR: Seq Check Error'; } else { errMsg = 'Secure Talk Error'; }
