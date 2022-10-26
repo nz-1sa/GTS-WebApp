@@ -97,7 +97,7 @@ export class Concurrency{
 				console.log('setting our job to be done');
 				Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
 					// do the job resolving the value being awaited on
-					async function(){let val:any = await fn(...args).catch(function(err:any){console.log(err);errMsg='ERROR:'+err;}).then((val:any)=>{resolve(val);});}
+					async function(){let val:any = await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then((val:any)=>{resolve(val);});}
 				);
 			});
 			resolveVarsSet();
