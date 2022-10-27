@@ -105,20 +105,20 @@ class Concurrency {
                 Concurrency.limitOneAtATimePromises[purpose] = Promise.resolve();
             }
             ;
-            console.log('storeage defined');
+            //console.log('storeage defined');
             var f;
             var dr;
             var errMsg = '';
             yield new Promise(function (resolveVarsSet) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    console.log('creating delayedResult');
+                    //console.log('creating delayedResult');
                     [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
                         return __awaiter(this, void 0, void 0, function* () {
                             // wait for other jobs that are scheduled to be done first
-                            console.log('waiting for earlier jobs to be completed');
+                            //console.log('waiting for earlier jobs to be completed');
                             yield Concurrency.limitOneAtATimePromises[purpose];
                             // set that this job is the job to be done
-                            console.log('setting our job to be done');
+                            //console.log('setting our job to be done');
                             Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
                             // do the job resolving the value being awaited on
                             function () {
@@ -129,18 +129,18 @@ class Concurrency {
                     resolveVarsSet();
                 });
             });
-            console.log('delayed result made');
+            //console.log('delayed result made');
             if (errMsg.length > 0) {
                 console.log('error is ' + errMsg);
                 return Promise.reject(errMsg);
             }
-            console.log('calling job');
+            //console.log('calling job');
             f(); // call the function to the job
             if (errMsg.length > 0) {
                 console.log('error is ' + errMsg);
                 return Promise.reject(errMsg);
             }
-            console.log('returning promise for job');
+            //console.log('returning promise for job');
             return dr; // return object wrapper of promise to wait for the job to be done
         });
     }

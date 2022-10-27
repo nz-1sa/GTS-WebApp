@@ -84,17 +84,17 @@ export class Concurrency{
 		console.log({purpose:purpose, fn:fn, args:args});
 		// ensure there is a promise defined for the specified purpose (used to limit execution to one at a time within purpose)
 		if(!Concurrency.limitOneAtATimePromises[purpose]){Concurrency.limitOneAtATimePromises[purpose]=Promise.resolve();};
-		console.log('storeage defined');
+		//console.log('storeage defined');
 
 		var f:Function; var dr:DelayedResult<any>; var errMsg:string = '';
 		await new Promise<void>(async function(resolveVarsSet:Function){
-			console.log('creating delayedResult');
+			//console.log('creating delayedResult');
 			[f,dr] = await DelayedResult.createDelayedResult<any>(async function(resolve:Function):Promise<any>{
 				// wait for other jobs that are scheduled to be done first
-				console.log('waiting for earlier jobs to be completed');
+				//console.log('waiting for earlier jobs to be completed');
 				await Concurrency.limitOneAtATimePromises[purpose];
 				// set that this job is the job to be done
-				console.log('setting our job to be done');
+				//console.log('setting our job to be done');
 				Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
 					// do the job resolving the value being awaited on
 					async function(){let val:any = await fn(...args).catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;}).then((val:any)=>{resolve(val);});}
@@ -102,18 +102,18 @@ export class Concurrency{
 			});
 			resolveVarsSet();
 		});
-		console.log('delayed result made');
+		//console.log('delayed result made');
 		if(errMsg.length > 0){
 			console.log('error is '+errMsg);
 			return Promise.reject(errMsg);
 		}
-		console.log('calling job');
+		//console.log('calling job');
 		f!();				// call the function to the job
 		if(errMsg.length > 0){
 			console.log('error is '+errMsg);
 			return Promise.reject(errMsg);
 		}
-		console.log('returning promise for job');
+		//console.log('returning promise for job');
 		return dr!;		// return object wrapper of promise to wait for the job to be done
 	}
 
