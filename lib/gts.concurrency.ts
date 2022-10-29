@@ -389,7 +389,6 @@ export class Concurrency{
 		});
 		
 		// One At a Time access now scheduled (and could be already running)
-		console.log('ONE');
 		let haveError:boolean = false;
 		let error:string = '';
 		var dr2:DelayedResult<T>;
@@ -416,10 +415,8 @@ export class Concurrency{
 		if(haveError){
 			return Promise.reject(error);
 		} else {
-			console.log('TWO');
 			// Sequence Job now scheduled (and could be already running)
 			let sjr:T = await dr2!.getResult();
-			console.log('THREE');
 			// Sequence job has been executed, return the value from the executed job
 			return sjr;
 		}

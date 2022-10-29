@@ -81,7 +81,7 @@ function getConnection(purpose, uuid) {
                 // return a connection from our pool if available
                 let testC = clientPool.releasedConnections.pop();
                 if (testC) { // as undefined type casts to false we know that it must be a client inside this test
-                    console.log('re-use released connection for uuid');
+                    console.log('re-use released connection for ' + uuid);
                     clientPool.openConnections[uuid] = testC; // store the client for future connections in the request
                     return new GTS.DM.WrappedResult().setData(testC); // provide the connection to variable connResult
                 }
