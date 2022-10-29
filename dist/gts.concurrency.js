@@ -384,7 +384,9 @@ class Concurrency {
                                     // resolve any scheduled jobs that are ready to do
                                     while (Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)) {
                                         let r = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
+                                        console.log({ runNextResult: r });
                                         if (r == "RunNow") {
+                                            console.log('Running waiting job');
                                             let f = Concurrency.sequencedJobsWaiting[purp][seq];
                                             f();
                                             delete Concurrency.sequencedJobsWaiting[purp][seq];
