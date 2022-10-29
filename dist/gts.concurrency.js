@@ -348,7 +348,7 @@ class Concurrency {
             var drSyncSchedule;
             yield new Promise(function (resolveOneAtATimeAccessScheduled) {
                 return __awaiter(this, void 0, void 0, function* () {
-                    drSyncSchedule = yield Concurrency.limitToOneAtATime(purpose, // que identifier (can have multiple ques run in parallel)
+                    drSyncSchedule = yield Concurrency.limitToOneAtATime('synchronousTalk_' + purpose, // que identifier (can have multiple ques run in parallel)
                     function (purp, seq, act, actArgs, sqChkIncr, sqChkIncrArgs) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (!Concurrency.sequencedJobsWaiting[purp]) {

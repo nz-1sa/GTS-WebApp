@@ -540,6 +540,7 @@ class Session {
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }
+            console.log({ seqCheckResult: res.rows[0].doseq });
             if (res.rows[0].doseq == 0) {
                 return retval.setData("RunNow");
             }

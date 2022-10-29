@@ -323,7 +323,7 @@ export class Concurrency{
 		var drSyncSchedule:DelayedResult<DelayedResult<T>>;
 		await new Promise<void>(async function(resolveOneAtATimeAccessScheduled){
 			drSyncSchedule = await Concurrency.limitToOneAtATime<DelayedResult<T>>(
-				purpose,		// que identifier (can have multiple ques run in parallel)
+				'synchronousTalk_'+purpose,		// que identifier (can have multiple ques run in parallel)
 				async function(purp:string, seq:number, act:Function, actArgs:any[], sqChkIncr:Function, sqChkIncrArgs:any[]):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
 					let seqCheck:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);

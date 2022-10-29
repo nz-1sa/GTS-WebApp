@@ -444,6 +444,7 @@ export class Session{
 		console.log({sessionId:sessionId, reqSequence:reqSequence});
 		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[sessionId,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
+		console.log({seqCheckResult:res.rows[0].doseq});
 		
 		if(res.rows[0].doseq==0){ return retval.setData("RunNow"); }
 		if(res.rows[0].doseq > 0 && res.rows[0].doseq < 10){ return retval.setData("RunSoon"); }
