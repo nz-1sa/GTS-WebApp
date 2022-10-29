@@ -294,8 +294,8 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 		}
 		
 		let adminResp:WS.WebResponse = await web.adminHandlers[action](dbId, requestIp, cookies, params);
-		console.log('admin response is');
-		console.log(adminResp);
+		//console.log('admin response is');
+		//console.log(adminResp);
 		
 		return adminResp;
 		

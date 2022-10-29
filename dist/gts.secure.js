@@ -316,8 +316,8 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                     return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${dbId} Missing admin action {action}`, `""`, []);
                 }
                 let adminResp = yield web.adminHandlers[action](dbId, requestIp, cookies, params);
-                console.log('admin response is');
-                console.log(adminResp);
+                //console.log('admin response is');
+                //console.log(adminResp);
                 return adminResp;
             });
         }, [uuid], Session.checkAndIncrementSequenceInDB, [uuid])

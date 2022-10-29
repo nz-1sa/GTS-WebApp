@@ -347,7 +347,7 @@ export class Concurrency{
 								});
 								varsSet();
 							})
-							console.log('Running job now '+purp+seq)
+							console.log('Running job now '+purp+'_'+seq)
 							fDoResolveNow!();	// asynchronously start the job
 							// resolve any scheduled jobs that are ready to do
 							while(Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)){
@@ -370,13 +370,13 @@ export class Concurrency{
 								varsSet();
 							})
 							Concurrency.sequencedJobsWaiting[purp][seq]=fDoResolveSoon!;
-							console.log('Qued to run soon '+purp+seq);
+							console.log('Qued to run soon '+purp+'_'+seq);
 							return drSoon!;
 						case "Invalid":
-								console.log('In Invalid '+purp+seq);
+								console.log('In Invalid '+purp+'_'+seq);
 								return Promise.reject("Invalid Sequence.");
 						default:
-							console.log('In default '+purp+seq);
+							console.log('In default '+purp+'_'+seq);
 							return Promise.reject("Unknown Result of Sequence Check.");
 					}
 					
