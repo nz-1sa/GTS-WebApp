@@ -65,8 +65,7 @@ function getConnection(purpose, uuid) {
         //console.log('in getConnection');
         // try to get an alrady open client for the uuid
         let client = clientPool.openConnections[uuid];
-        if (client) {
-            console.log('have already open connection');
+        if (client) { /*console.log('have already open connection');*/
             return retval.setData(client);
         } // provide the connection to the caller
         // Require that only one thread can be opening a connection at a time, others will be qued

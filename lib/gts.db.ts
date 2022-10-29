@@ -33,7 +33,7 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 	
 	// try to get an alrady open client for the uuid
 	let client:Pg.PoolClient = clientPool.openConnections[uuid];
-	if(client){ console.log('have already open connection'); return retval.setData(client); }								// provide the connection to the caller
+	if(client){ /*console.log('have already open connection');*/ return retval.setData(client); }								// provide the connection to the caller
 	
 	// Require that only one thread can be opening a connection at a time, others will be qued
 	let dr:DelayedResult<GTS.DM.WrappedResult<Pg.PoolClient>> = await Concurrency.limitToOneAtATime<GTS.DM.WrappedResult<Pg.PoolClient>>('openDbConnection', async function(uuid:string){

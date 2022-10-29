@@ -90,7 +90,7 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
                 console.log('already logged in');
                 return new WS.WebResponse(true, "", `UUID:${uuid} Already logged in`, `Already logged in`, []);
             }
-            console.log('initialise already done');
+            console.log('early exit, session already intialised');
             return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
         }
         let now = new Date();
