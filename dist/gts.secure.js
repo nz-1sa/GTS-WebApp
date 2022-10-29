@@ -180,6 +180,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
 // process logout for a session
 function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log('in handleLogoutRequest');
         // check that there is an open session to log out from
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
         if (!hs || !s) {

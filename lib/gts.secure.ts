@@ -150,6 +150,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 
 // process logout for a session
 async function handleLogoutRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string):Promise<WS.WebResponse>{
+	console.log('in handleLogoutRequest');
 	// check that there is an open session to log out from
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
 	if(!hs || !s){

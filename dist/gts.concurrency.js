@@ -122,7 +122,13 @@ class Concurrency {
                             Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
                             // do the job resolving the value being awaited on
                             function () {
-                                return __awaiter(this, void 0, void 0, function* () { let val = yield fn(...args).catch((err) => { console.log(err); errMsg = 'ERROR:' + err; }).then((val) => { resolve(val); }); });
+                                return __awaiter(this, void 0, void 0, function* () {
+                                    console.log('START ONE AT A TIME ' + purpose);
+                                    let val = yield fn(...args)
+                                        .catch((err) => { console.log(err); errMsg = 'ERROR:' + err; })
+                                        .then((val) => { resolve(val); });
+                                    console.log('END ONE AT A TIME ' + purpose);
+                                });
                             });
                         });
                     });
