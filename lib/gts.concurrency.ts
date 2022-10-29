@@ -351,9 +351,9 @@ export class Concurrency{
 							fDoResolveNow!();	// asynchronously start the job
 							// resolve any scheduled jobs that are ready to do
 							while(Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)){
-								let r:string = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
+								let r:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
 								console.log({runNextResult:r});
-								if(r=="RunNow"){
+								if(r.data=="RunNow"){
 									console.log('Running waiting job');
 									let f:Function = Concurrency.sequencedJobsWaiting[purp][seq];
 									f();

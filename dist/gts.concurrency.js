@@ -385,7 +385,7 @@ class Concurrency {
                                     while (Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)) {
                                         let r = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                                         console.log({ runNextResult: r });
-                                        if (r == "RunNow") {
+                                        if (r.data == "RunNow") {
                                             console.log('Running waiting job');
                                             let f = Concurrency.sequencedJobsWaiting[purp][seq];
                                             f();
