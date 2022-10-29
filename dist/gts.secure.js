@@ -84,7 +84,7 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('in handleStartSessionRequest');
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
-        console.log('done hasSession check');
+        //console.log('done hasSession check');
         if (hs && s) {
             if (s.status == SessionStatus.LoggedIn) {
                 console.log('already logged in');
@@ -106,15 +106,15 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
             console.log('loop safety break on session id generation');
             return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
         }
-        console.log('got session id');
+        //console.log('got session id');
         // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
         let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
-        console.log('established session object');
-        console.log({ uuid: uuid });
+        //console.log('established session object');
+        console.log({ sessionIs: uuid });
         ns.addToDB(uuid);
-        console.log('session added to db');
+        //console.log('session added to db');
         ns.initialiseCaptcha(uuid, sessionId);
-        console.log('new session being returned');
+        //console.log('new session being returned');
         return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
     });
 }
@@ -124,7 +124,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
         console.log('in handleLoginRequest');
         // check that there is an open session to log in to
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
-        console.log('done hasSession check');
+        //console.log('done hasSession check');
         if (!hs || !s) {
             console.log('returning no session error');
             return new WS.WebResponse(false, "ERROR: A session needs to be started before loggin in.", `UUID:${uuid} Login called before startSession`, '', []);
@@ -140,11 +140,11 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
         }
         //TODO: get knownSaltPassHash for email address from database
         let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI='; //knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
-        console.log('using debug key to decode');
-        console.log({ knownSaltPassHash: knownSaltPassHash, captcha: sess.captcha, challenge: challenge });
+        //console.log('using debug key to decode');
+        //console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
         // decrypt challenge using knownSaltPassHash and captcha
         let decoded = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
-        console.log({ decoded: decoded });
+        //console.log({decoded:decoded});
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
             console.log('failed regex check');
             return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`, '', []);
@@ -156,24 +156,24 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
         }
         let now = new Date().getTime();
         let timeDiff = now - parseInt(decoded);
-        console.log({ now: now, timeDiff: timeDiff });
+        //console.log({now:now, timeDiff:timeDiff});
         if (timeDiff < 0 || timeDiff > 20000) { // request must arrive within 20 seconds
             console.log('failed Date check');
             return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
         }
         // generate password and nonce for the session
-        console.log('setting session credentials');
+        //console.log('setting session credentials');
         sess.status = SessionStatus.LoggedIn;
         sess.password = yield Session.genSessionPassword();
         sess.nonce = Math.floor(1 + Math.random() * 483600);
         sess.seq = 1;
         sess.updateDB(uuid);
-        console.log({ sess: sess });
+        //console.log({sess:sess});
         // encrypt and return to client the password to use for the session, and the nonce to start with
         let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ pass: sess.password, nonce: sess.nonce });
-        console.log({ plainTextResponse: plainTextResponse });
+        //console.log({plainTextResponse:plainTextResponse});
         let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
-        console.log({ encResponse: encResponse });
+        //console.log({encResponse:encResponse});
         return new WS.WebResponse(true, "", `UUID:${uuid} Login success`, `"${encResponse}"`);
     });
 }
@@ -205,7 +205,7 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         }
         let now = new Date().getTime();
         let timeDiff = now - parseInt(decoded);
-        console.log({ now: now, timeDiff: timeDiff });
+        //console.log({now:now, timeDiff:timeDiff});
         if (timeDiff < 0 || timeDiff > 20000) { // request must arrive within 20 seconds
             console.log('failed Date check');
             return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, request to old.`, '', []);
@@ -214,9 +214,9 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         sess.updateDB(uuid);
         // encrypt and return to client the current time to allow checking for valid response
         let plainTextResponse = new Date().getTime().toString();
-        console.log({ plainTextResponse: plainTextResponse });
+        //console.log({plainTextResponse:plainTextResponse});
         let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
-        console.log({ encResponse: encResponse });
+        //console.log({encResponse:encResponse});
         return new WS.WebResponse(true, "", `UUID:${uuid} Logout success`, `"${encResponse}"`);
     });
 }
@@ -248,16 +248,17 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
         }
         let now = new Date().getTime();
         let timeDiff = now - parseInt(decoded);
-        console.log({ now: now, timeDiff: timeDiff });
+        //console.log({now:now, timeDiff:timeDiff});
         if (timeDiff < 0 || timeDiff > 20000) { // request must arrive within 20 seconds
             console.log('failed Date check');
             return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, request to old.`, '', []);
         }
+        console.log({ sequence: sess.seq });
         // encrypt and return to client the current sequence to use for talking, and a date check of the response
         let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ seq: sess.seq.toString() });
         //console.log({plainTextResponse:plainTextResponse});
         let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
-        console.log({ encResponse: encResponse });
+        //console.log({encResponse:encResponse});
         return new WS.WebResponse(true, "", `UUID:${uuid} curSeq success`, `"${encResponse}"`);
     });
 }
@@ -265,30 +266,37 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
 function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('handleSecureTalk');
-        console.log({ uuid: uuid, requestIp: requestIp, cookies: cookies, sequence: sequence });
+        //console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
         if (!hs) {
+            console.log('reject, no session');
             return new WS.WebResponse(false, "ERROR: Need to have session first.", `UUID:${uuid} Attempted session talk before session start`, '', []);
         }
         if (!s) {
+            console.log('reject, error getting session');
             return new WS.WebResponse(false, "ERROR: Failed to connect to session.", `UUID:${uuid} Error getting session from DB`, '', []);
         }
         let sess = s;
         if (sess.ip != requestIp) {
+            console.log('reject, ip changed');
             return new WS.WebResponse(false, "ERROR: Can not change IP during session.", `UUID:${uuid} Talk called from wrong IP.`, '', []);
         }
         if (sess.status != SessionStatus.LoggedIn) {
+            console.log('reject, not logged in');
             return new WS.WebResponse(false, "ERROR: Need to login first.", `UUID:${uuid} Attempted session talk before login`, '', []);
         }
         ;
         if (!new RegExp("^[0-9]+$", "g").test(sequence)) {
+            console.log('reject, failed sequence regex');
             return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence fails regex check`, '', []);
         }
         let iSequence = parseInt(sequence);
         if (iSequence < s.seq) {
+            console.log('reject, seqeunce too low');
             return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence is less than expected session sequence`, '', []);
         }
         if (iSequence > s.seq + 10) {
+            console.log('reject, sequence too high');
             return new WS.WebResponse(false, "ERROR: Invalid sequence.", `UUID:${uuid} Secure Talk sequence is too large (10+ expected)`, '', []);
         }
         // by getting to here there is a logged in session
@@ -297,12 +305,13 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, iSequence, function (purpose, seqNum, dbId) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);
-                console.log({ pass: sess.password, nonce: sess.nonce + seqNum });
+                //console.log({pass:sess.password, nonce:sess.nonce+seqNum});
                 // decrypt challenge using knownSaltPassHash and captcha
                 let decoded = Encodec.decrypt(message, sess.password, (sess.nonce + seqNum));
                 const [action, params] = JSON.parse(decoded);
                 console.log({ action: action, params: params });
                 if (!web.adminHandlers[action]) {
+                    console.log('reject, invalid admin action specified');
                     return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${dbId} Missing admin action {action}`, `""`, []);
                 }
                 let adminResp = yield web.adminHandlers[action](dbId, requestIp, cookies, params);
@@ -326,7 +335,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             }
             retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`, '', []);
         });
-        console.log('retval for secureTalk is ' + retval.toString());
+        //console.log('retval for secureTalk is '+retval.toString());
         return retval;
     });
 }
@@ -488,7 +497,7 @@ class Session {
     // get a session from the database for the specified sessionId
     static getSessionFromDB(uuid, sessionId) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log('in getSessionFromDB');
+            //console.log('in getSessionFromDB');
             let retval = new GTS.DM.WrappedResult();
             let fetchConn = yield DBCore.getConnection('Session.getSessionFromDB', uuid);
             if (fetchConn.error) {
@@ -500,15 +509,15 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            console.log('got db client');
+            //console.log('got db client');
             const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
-            console.log('awaited db query');
+            //console.log('awaited db query');
             if (res.rowCount == 0) {
                 console.log('session not found.');
                 return retval.setError('Session not found.');
             }
             let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
-            console.log('got session object from db');
+            //console.log('got session object from db');
             //TODO: update last seen
             return retval.setData(s);
         });
