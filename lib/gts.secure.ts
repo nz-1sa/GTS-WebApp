@@ -448,7 +448,7 @@ export class Session{
 		console.log({seqCheckResult:res.rows[0].doseq});
 		
 		if(res.rows[0].doseq==0){ return retval.setData("RunNow"); }
-		if(res.rows[0].doseq > 0 && res.rows[0].doseq < 10){ return retval.setData("RunSoon"); }
+		if(res.rows[0].doseq < 0 && res.rows[0].doseq >= -10){ return retval.setData("RunSoon"); }
 		return retval.setData("Invalid");
 	}
 	
