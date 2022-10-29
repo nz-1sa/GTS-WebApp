@@ -98,8 +98,8 @@ class Concurrency {
     // for a given purpose, limit concurrency to one at a time
     static limitToOneAtATime(purpose, fn, ...args) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log('in limitToOneAtATime');
-            console.log({ purpose: purpose, fn: fn, args: args });
+            //console.log('in limitToOneAtATime');
+            //console.log({purpose:purpose, fn:fn, args:args});
             // ensure there is a promise defined for the specified purpose (used to limit execution to one at a time within purpose)
             if (!Concurrency.limitOneAtATimePromises[purpose]) {
                 Concurrency.limitOneAtATimePromises[purpose] = Promise.resolve();
