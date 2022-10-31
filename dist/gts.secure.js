@@ -302,7 +302,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         }
         // by getting to here there is a logged in session
         let doLogSequenceCheck = true;
-        let retval = new WS.WebResponse(false, 'ERROR', `UUID:${uuid} Unknown error`, '', []);
+        let retval = new WS.WebResponse(false, 'ERROR Unset return value', `UUID:${uuid} Unknown error`, '', []);
         yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, iSequence, function (purpose, seqNum, dbId) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('talking at number #' + seqNum);

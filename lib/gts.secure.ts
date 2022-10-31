@@ -278,7 +278,7 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
-	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
+	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR Unset return value',`UUID:${uuid} Unknown error`, '', []);
 	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, iSequence, async function(purpose:string, seqNum:number, dbId:string):Promise<WS.WebResponse>{ // dbId:string is uuid as param to async func,  'talkSession'+ id for purpose
 		console.log('talking at number #'+seqNum);
 		//console.log({pass:sess.password, nonce:sess.nonce+seqNum});

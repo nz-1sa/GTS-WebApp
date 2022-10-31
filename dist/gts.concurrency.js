@@ -46,6 +46,9 @@ class DelayedResult {
     constructor(pPromise) {
         this.p2 = pPromise;
     }
+    reject(message) {
+        console.log('reject not yet set for promise');
+    }
     getResult() {
         return __awaiter(this, void 0, void 0, function* () {
             return this.p2;
@@ -55,20 +58,39 @@ class DelayedResult {
         return __awaiter(this, void 0, void 0, function* () {
             var dr;
             var resolvePromiseDelayedResult;
+            var rejectPromiseDelayedResult;
             yield new Promise(function (varsSetResolve) {
-                dr = new DelayedResult(new Promise(function (resolve) {
+                dr = new DelayedResult(new Promise(function (resolve, reject) {
                     resolvePromiseDelayedResult = function () {
                         pAction(resolve);
+                    };
+                    rejectPromiseDelayedResult = function (message) {
+                        reject(message);
                     };
                 }));
                 varsSetResolve();
             });
+            dr.reject = rejectPromiseDelayedResult;
             return [resolvePromiseDelayedResult, dr];
             // when resolvePromiseDelayedResult() is called dr.p2 will resolve with the value returned from resolvePromiseDelayedResult()
         });
     }
 }
 exports.DelayedResult = DelayedResult;
+class SequencedJobWaiting {
+    constructor(jStart, jTimeout) {
+        this.jobStarted = false;
+        this.jobStarted = false;
+        this.startJob = function () {
+            return __awaiter(this, void 0, void 0, function* () { this.jobStarted = true; yield jStart(); });
+        };
+        this.timeoutJob = function () {
+            return __awaiter(this, void 0, void 0, function* () { if (!this.jobStarted) {
+                yield jTimeout();
+            } });
+        };
+    }
+}
 // class to help make code that can be run concurrently
 class Concurrency {
     // -----
@@ -387,8 +409,8 @@ class Concurrency {
                                         console.log({ runNextResult: r });
                                         if (r.data == "RunNow") {
                                             console.log('Running waiting job');
-                                            let f = Concurrency.sequencedJobsWaiting[purp][seq];
-                                            f();
+                                            let s = Concurrency.sequencedJobsWaiting[purp][seq];
+                                            s.startJob();
                                             delete Concurrency.sequencedJobsWaiting[purp][seq];
                                         }
                                     }
@@ -407,8 +429,16 @@ class Concurrency {
                                             varsSet();
                                         });
                                     });
-                                    Concurrency.sequencedJobsWaiting[purp][seq] = fDoResolveSoon;
+                                    let s = new SequencedJobWaiting(fDoResolveSoon, function () {
+                                        // clear job from que
+                                        delete Concurrency.sequencedJobsWaiting[purp][seq];
+                                        // somehow reject the promise
+                                        drSoon.reject('timedout');
+                                    });
+                                    Concurrency.sequencedJobsWaiting[purp][seq] = s;
                                     console.log('Qued to run soon ' + purp + '_' + seq);
+                                    // Put a timer on this, advance jobs have to arrive not just close in sequence, but close in time
+                                    global.setTimeout(s.timeoutJob, 5000);
                                     return drSoon;
                                 case "Invalid":
                                     console.log('In Invalid ' + purp + '_' + seq);

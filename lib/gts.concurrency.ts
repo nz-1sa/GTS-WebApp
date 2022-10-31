@@ -19,6 +19,9 @@ export interface IAsyncAction {
 // for an action (paramaterless function) create a promise  to wait on a delayed result, and a function to call later that runs the action and resolves the promise
 export class DelayedResult<T>{
     private p2:Promise<T>;
+	public reject(message:string){
+		console.log('reject not yet set for promise');
+	}
     constructor(pPromise:Promise<T>){
         this.p2 = pPromise;
     }
@@ -28,17 +31,33 @@ export class DelayedResult<T>{
     public static async createDelayedResult<T>(pAction:IAsyncAction):Promise<[Function,DelayedResult<T>]>{
         var dr:DelayedResult<T>;
         var resolvePromiseDelayedResult:Function;
+		var rejectPromiseDelayedResult:(message: string) => void;
         await new Promise(function(varsSetResolve:Function){
-            dr = new DelayedResult<T>( new Promise(function(resolve){
+            dr = new DelayedResult<T>( new Promise(function(resolve, reject){
                 resolvePromiseDelayedResult = function(){
                     pAction(resolve);
                 }
+				rejectPromiseDelayedResult = function(message:string){
+					reject(message);
+				}
             }) );
             varsSetResolve();
         });
+		dr!.reject = rejectPromiseDelayedResult!;
         return [resolvePromiseDelayedResult!,dr!];
         // when resolvePromiseDelayedResult() is called dr.p2 will resolve with the value returned from resolvePromiseDelayedResult()
     }
+}
+
+class SequencedJobWaiting{
+	public jobStarted:boolean = false;
+	public startJob:Function;
+	public timeoutJob:Function;
+	constructor(jStart:Function, jTimeout:Function){
+		this.jobStarted = false;
+		this.startJob = async function(){this.jobStarted = true; await jStart(); };
+		this.timeoutJob = async function(){if(!this.jobStarted){await jTimeout(); }};
+	}
 }
 
 // class to help make code that can be run concurrently
@@ -317,7 +336,7 @@ export class Concurrency{
 		return retval.setData("Invalid");
 	}
 
-	private static sequencedJobsWaiting: GTS.DM.HashTable<GTS.DM.HashTable<Function>> = {};
+	private static sequencedJobsWaiting: GTS.DM.HashTable<GTS.DM.HashTable<SequencedJobWaiting>> = {};
 
 	static async doSequencedJob<T>(purpose:string, sequence:number, action:Function, actionArgs?:any[], seqCheckAndIncr?:Function, seqCheckArgs?:any[]):Promise<T>{
 		// default to in memory sequence checking if no function provided
@@ -355,8 +374,8 @@ export class Concurrency{
 								console.log({runNextResult:r});
 								if(r.data=="RunNow"){
 									console.log('Running waiting job');
-									let f:Function = Concurrency.sequencedJobsWaiting[purp][seq];
-									f();
+									let s:SequencedJobWaiting = Concurrency.sequencedJobsWaiting[purp][seq];
+									s.startJob();
 									delete Concurrency.sequencedJobsWaiting[purp][seq];
 								}
 							} 
@@ -370,9 +389,19 @@ export class Concurrency{
 									resolve(act(purp,seq,...actArgs));
 								});
 								varsSet();
-							})
-							Concurrency.sequencedJobsWaiting[purp][seq]=fDoResolveSoon!;
+							});
+							let s:SequencedJobWaiting = new SequencedJobWaiting(fDoResolveSoon!, function(){
+								// clear job from que
+								delete Concurrency.sequencedJobsWaiting[purp][seq];
+								// somehow reject the promise
+								drSoon.reject('timedout');
+							});
+							Concurrency.sequencedJobsWaiting[purp][seq]=s;
 							console.log('Qued to run soon '+purp+'_'+seq);
+							// Put a timer on this, advance jobs have to arrive not just close in sequence, but close in time
+							global.setTimeout(s.timeoutJob, 5000);
+							
+							
 							return drSoon!;
 						case "Invalid":
 								console.log('In Invalid '+purp+'_'+seq);

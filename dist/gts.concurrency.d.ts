@@ -9,6 +9,7 @@ export interface IAsyncAction {
 }
 export declare class DelayedResult<T> {
     private p2;
+    reject(message: string): void;
     constructor(pPromise: Promise<T>);
     getResult(): Promise<T>;
     static createDelayedResult<T>(pAction: IAsyncAction): Promise<[Function, DelayedResult<T>]>;
