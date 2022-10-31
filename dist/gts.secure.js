@@ -310,7 +310,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
                 // decrypt challenge using knownSaltPassHash and captcha
                 let decoded = Encodec.decrypt(message, sess.password, (sess.nonce + seqNum));
                 const [action, params] = JSON.parse(decoded);
-                console.log({ action: action, params: params });
+                console.log('request received for ' + action);
                 if (!web.adminHandlers[action]) {
                     console.log('reject, invalid admin action specified');
                     return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${dbId} Missing admin action {action}`, `""`, []);
@@ -327,12 +327,14 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(plainTextResponse, sess.password, (sess.nonce + iSequence))}"`, []);
         })
             .catch((err) => {
+            console.log('sequence talk error');
+            console.log(err);
             let errMsg = '';
             if (err.startsWith('Seq Check Error')) {
                 errMsg = 'ERROR: Seq Check Error';
             }
             else {
-                errMsg = 'Secure Talk Error';
+                errMsg = 'ERROR: Secure Talk Error';
             }
             retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`, '', []);
         });

@@ -279,14 +279,14 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	// by getting to here there is a logged in session
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR',`UUID:${uuid} Unknown error`, '', []);
-	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, iSequence, async function(purpose:string, seqNum:number, dbId:string){ // uuid:string as paramto async func,  'talkSession'+ id for purpose
+	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, iSequence, async function(purpose:string, seqNum:number, dbId:string):Promise<WS.WebResponse>{ // dbId:string is uuid as param to async func,  'talkSession'+ id for purpose
 		console.log('talking at number #'+seqNum);
 		//console.log({pass:sess.password, nonce:sess.nonce+seqNum});
 		
 		// decrypt challenge using knownSaltPassHash and captcha
 		let decoded:string = Encodec.decrypt(message, sess.password, (sess.nonce+seqNum));
 		const [action,params] = JSON.parse(decoded);
-		console.log({action:action, params:params});
+		console.log('request received for '+action);
 		
 		if(!web.adminHandlers[action]){
 			console.log('reject, invalid admin action specified');
@@ -307,8 +307,10 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 			retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(plainTextResponse,sess.password, (sess.nonce+iSequence))}"`, []);
 		} )
 		.catch((err:any) => {
+			console.log('sequence talk error');
+			console.log(err);
 			let errMsg:string = '';
-			if((err as string).startsWith('Seq Check Error')){ errMsg = 'ERROR: Seq Check Error'; } else { errMsg = 'Secure Talk Error'; }
+			if((err as string).startsWith('Seq Check Error')){ errMsg = 'ERROR: Seq Check Error'; } else { errMsg = 'ERROR: Secure Talk Error'; }
 			retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`,'', []);
 		} );
 		
