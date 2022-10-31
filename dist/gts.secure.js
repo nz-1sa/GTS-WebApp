@@ -267,7 +267,6 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
 function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('handleSecureTalk');
-        console.log('x');
         const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
         if (!hs) {
             console.log('reject, no session');
@@ -756,7 +755,6 @@ class Session {
     }
     static hasSession(uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log({ uuid: uuid, requestIp: requestIp, cookies: cookies });
             if (!cookies['session']) {
                 console.log('no session cookie at hasSession check');
                 return [false, undefined];
