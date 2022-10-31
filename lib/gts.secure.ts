@@ -310,7 +310,13 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 			console.log('sequence talk error');
 			console.log(err);
 			let errMsg:string = '';
-			if((err as string).startsWith('Seq Check Error')){ errMsg = 'ERROR: Seq Check Error'; } else { errMsg = 'ERROR: Secure Talk Error'; }
+			if((err as string).startsWith('Seq Check Error')){
+				errMsg = 'ERROR: Seq Check Error'; 
+			}else if(err =='timedout'){
+				errMsg = 'ERROR: Timedout Before Start';
+			} else {
+				errMsg = 'ERROR: Secure Talk Error';
+			}
 			retval = new WS.WebResponse(false, errMsg, `UUID:${uuid} ERROR: Secure Talk. ${err}`,'', []);
 		} );
 		

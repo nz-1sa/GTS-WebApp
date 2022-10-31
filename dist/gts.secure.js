@@ -333,6 +333,9 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             if (err.startsWith('Seq Check Error')) {
                 errMsg = 'ERROR: Seq Check Error';
             }
+            else if (err == 'timedout') {
+                errMsg = 'ERROR: Timedout Before Start';
+            }
             else {
                 errMsg = 'ERROR: Secure Talk Error';
             }
