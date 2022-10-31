@@ -243,7 +243,7 @@ async function handleSequenceRequest(uuid:string, requestIp:string, cookies:GTS.
 // secure talk within a session
 async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string):Promise<WS.WebResponse>{
 	console.log('handleSecureTalk');
-	//console.log({uuid:uuid, requestIp:requestIp, cookies:cookies, sequence:sequence});
+	console.log('x');
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
 	if(!hs){
 		console.log('reject, no session');
