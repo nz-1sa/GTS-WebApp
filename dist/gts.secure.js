@@ -527,7 +527,7 @@ class Session {
             return retval.setData(s);
         });
     }
-    //TODO: needs to be like Concurrency.inMemorySequenceTracking
+    // function is like Concurrency.inMemorySequenceTracking, but tracks sequence in session table of db rather than in memory
     static checkAndIncrementSequenceInDB(sessionId, reqSequence, uuid) {
         return __awaiter(this, void 0, void 0, function* () {
             let retval = new GTS.DM.WrappedResult();
@@ -543,7 +543,7 @@ class Session {
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }
-            console.log({ test: 'compare talk sequence with db session store', sessionId: sessionId, reqSequence: reqSequence, expectedSequence: res.rows[0].doseq });
+            console.log({ test: 'compare talk sequence with db session store', sessionId: sessionId, reqSequence: reqSequence, seqDiff: res.rows[0].doseq });
             if (res.rows[0].doseq == 0) {
                 return retval.setData("RunNow");
             }

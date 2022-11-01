@@ -441,7 +441,7 @@ export class Session{
 		return retval.setData( s );
 	}
 	
-	//TODO: needs to be like Concurrency.inMemorySequenceTracking
+	// function is like Concurrency.inMemorySequenceTracking, but tracks sequence in session table of db rather than in memory
 	static async checkAndIncrementSequenceInDB(sessionId:string, reqSequence:number, uuid:string): Promise<GTS.DM.WrappedResult<string>>{
 		let retval: GTS.DM.WrappedResult<string> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('Session.checkAndIncrementSequence', uuid);
@@ -450,7 +450,7 @@ export class Session{
 		let client:DBCore.Client = fetchConn.data;
 		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[sessionId,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
-		console.log({test:'compare talk sequence with db session store', sessionId:sessionId, reqSequence:reqSequence, expectedSequence:res.rows[0].doseq});
+		console.log({test:'compare talk sequence with db session store', sessionId:sessionId, reqSequence:reqSequence, seqDiff:res.rows[0].doseq});
 		if(res.rows[0].doseq==0){ return retval.setData("RunNow"); }
 		if(res.rows[0].doseq < 0 && res.rows[0].doseq >= -10){ return retval.setData("RunSoon"); }
 		return retval.setData("Invalid");
