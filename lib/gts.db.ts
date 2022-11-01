@@ -40,12 +40,12 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 		//console.log('getConnection - in one at a time');
 		// when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
 		let c:Pg.PoolClient = clientPool.openConnections[uuid];	
-		if(c){ console.log('have connection for uuid'); return new GTS.DM.WrappedResult().setData(c); }	// provide the connection to variable connResult
+		if(c){ console.log('OAT_DBCON have connection for uuid'); return new GTS.DM.WrappedResult().setData(c); }	// provide the connection to variable connResult
 		
 		// return a connection from our pool if available
 		let testC:Pg.PoolClient|undefined = clientPool.releasedConnections.pop();
 		if(testC){																			// as undefined type casts to false we know that it must be a client inside this test
-			 console.log('re-use released connection for '+uuid); 
+			 console.log('OAT_DBCON re-use released connection for '+uuid); 
 			clientPool.openConnections[uuid] = testC!;						// store the client for future connections in the request
 			return new GTS.DM.WrappedResult().setData(testC!);	// provide the connection to variable connResult
 		}
@@ -58,7 +58,7 @@ export async function getConnection(purpose: string, uuid: string): Promise<GTS.
 			return new GTS.DM.WrappedResult().setError('error connecting to db\r\n'+err);
 		}
 		if(c){
-			console.log('starting new connection for '+uuid); 
+			console.log('OAT_DBCON starting new connection for '+uuid); 
 			clientPool.openConnections[uuid] = c;								// store the client is open for the uuid
 			return new GTS.DM.WrappedResult().setData(c);			// provide the connection to variable connResult
 		}

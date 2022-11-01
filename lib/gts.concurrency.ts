@@ -352,8 +352,13 @@ export class Concurrency{
 				async function(purp:string, seq:number, act:Function, actArgs:any[], sqChkIncr:Function, sqChkIncrArgs:any[]):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
 					let seqCheck:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
-					// wrapped result
-					console.log({seqCheck:seqCheck.data});
+					// Check if got and incremented sequence from db successfully
+					if(seqCheck.error){
+						console.log('error checking and incrementing talk sequence in the db');
+						console.log(seqCheck.message);
+						return Promise.reject('Error double checking sequence to talk in the db');
+					}
+					
 					switch(seqCheck.data){
 						case "RunNow":
 							// The sequence of the job at hand is the expected sequence
@@ -371,6 +376,12 @@ export class Concurrency{
 							// resolve any scheduled jobs that are ready to do
 							while(Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)){
 								let r:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
+								if(r.error){
+									console.log('error checking and incrementing talk sequence in the db for qued job');
+									console.log(r.message);
+									return Promise.reject('Error double checking sequence to talk in the db for qued job');
+								}
+								
 								console.log({runNextResult:r});
 								if(r.data=="RunNow"){
 									console.log('Running waiting job');
