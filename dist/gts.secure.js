@@ -539,13 +539,11 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            console.log('checking sequence in db');
-            console.log({ sessionId: sessionId, reqSequence: reqSequence });
             const res = yield client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)', [sessionId, reqSequence, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }
-            console.log({ seqCheckResult: res.rows[0].doseq });
+            console.log({ test: 'compare talk sequence with db session store', sessionId: sessionId, reqSequence: reqSequence, expectedSequence: res.rows[0].doseq });
             if (res.rows[0].doseq == 0) {
                 return retval.setData("RunNow");
             }
