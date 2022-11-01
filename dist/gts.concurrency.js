@@ -385,7 +385,7 @@ class Concurrency {
                             let seqCheck = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                             // Check if got and incremented sequence from db successfully
                             if (seqCheck.error) {
-                                console.log('error checking and incrementing talk sequence in the db');
+                                console.log('OAT_TALK error checking and incrementing talk sequence in the db');
                                 console.log(seqCheck.message);
                                 return Promise.reject('Error double checking sequence to talk in the db');
                             }
@@ -405,19 +405,19 @@ class Concurrency {
                                             varsSet();
                                         });
                                     });
-                                    console.log('Running job now ' + purp + '_' + seq);
+                                    console.log('OAT_TALK Running job now ' + purp + '_' + seq);
                                     fDoResolveNow(); // asynchronously start the job
                                     // resolve any scheduled jobs that are ready to do
                                     while (Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)) {
                                         let r = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                                         if (r.error) {
-                                            console.log('error checking and incrementing talk sequence in the db for qued job');
+                                            console.log('OAT_TALK error checking and incrementing talk sequence in the db for qued job');
                                             console.log(r.message);
                                             return Promise.reject('Error double checking sequence to talk in the db for qued job');
                                         }
                                         console.log({ runNextResult: r });
                                         if (r.data == "RunNow") {
-                                            console.log('Running waiting job');
+                                            console.log('OAT_TALK Running waiting job');
                                             let s = Concurrency.sequencedJobsWaiting[purp][seq];
                                             s.startJob();
                                             delete Concurrency.sequencedJobsWaiting[purp][seq];
@@ -445,15 +445,15 @@ class Concurrency {
                                         drSoon.reject('timedout');
                                     });
                                     Concurrency.sequencedJobsWaiting[purp][seq] = s;
-                                    console.log('Qued to run soon ' + purp + '_' + seq);
+                                    console.log('OAT_TALK Qued to run soon ' + purp + '_' + seq);
                                     // Put a timer on this, advance jobs have to arrive not just close in sequence, but close in time
                                     global.setTimeout(s.timeoutJob, 5000);
                                     return drSoon;
                                 case "Invalid":
-                                    console.log('In Invalid ' + purp + '_' + seq);
+                                    console.log('OAT_TALK In Invalid ' + purp + '_' + seq);
                                     return Promise.reject("Invalid Sequence.");
                                 default:
-                                    console.log('In default ' + purp + '_' + seq);
+                                    console.log('OAT_TALK In default ' + purp + '_' + seq + ' ' + seqCheck.data);
                                     return Promise.reject("Unknown Result of Sequence Check.");
                             }
                         });
