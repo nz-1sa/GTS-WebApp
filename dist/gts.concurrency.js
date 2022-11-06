@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Concurrency = exports.DelayedResult = void 0;
+exports.Concurrency = exports.QuedJob = exports.DelayedResult = void 0;
 const GTS = __importStar(require("./gts"));
 // Holds a promise that is resolved when a delay is completed, and a timeout that can clear/cancel the delay
 class CancellableDelay {
@@ -91,6 +91,31 @@ class SequencedJobWaiting {
         };
     }
 }
+class QuedJob {
+    constructor(f, dr) {
+        this.started = false;
+        this.subFunc = f;
+        this.dRes = dr;
+    }
+    run() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.started = true;
+            yield this.subFunc();
+        });
+    }
+    isStarted() {
+        return this.started;
+    }
+    getResult() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return this.dRes.getResult();
+        });
+    }
+    reject(message) {
+        this.dRes.reject(message);
+    }
+}
+exports.QuedJob = QuedJob;
 // class to help make code that can be run concurrently
 class Concurrency {
     // -----
@@ -174,8 +199,8 @@ class Concurrency {
     }
     static limitXAtATime(purpose, fn, ...args) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!SecureCon.limitXAtATimeQues[purpose]) {
-                SecureCon.limitXAtATimeQues[purpose] = [];
+            if (!Concurrency.limitXAtATimeQues[purpose]) {
+                Concurrency.limitXAtATimeQues[purpose] = [];
             }
             ;
             // create a delayed result that gives a promise for when the job is run
@@ -191,22 +216,45 @@ class Concurrency {
             yield Concurrency.limitToOneAtATime('limitXAtATime_' + purpose, function () {
                 return __awaiter(this, void 0, void 0, function* () {
                     console.log('OAAT_LIMX starting limitXAtATime ' + purpose);
-                    SecureCon.limitTenAtATimeQues[purpose].push(job);
-                    if (SecureCon.limitTenAtATimeQues[purpose].length < 3) { //10){
-                        console.log('OAAT_LIMX job qued at ' + SecureCon.limitTenAtATimeQues[purpose].length + ', starting now');
+                    Concurrency.limitXAtATimeQues[purpose].push(job);
+                    if (Concurrency.limitXAtATimeQues[purpose].length < 10) {
+                        console.log('OAAT_LIMX job qued at ' + Concurrency.limitXAtATimeQues[purpose].length + ', starting now');
                         job.run().then(() => {
                             //console.log('job finished, removing from que');
                             // remove from que after job is done and start any waiting jobs
-                            SecureCon.finishedLimitedJob(purpose, job);
+                            Concurrency.finishedLimitedJob(purpose, job);
                         });
                     }
                     else {
-                        console.log('OAAT_LIMX job delayed, qued at ' + SecureCon.limitTenAtATimeQues[purpose].length);
+                        console.log('OAAT_LIMX job delayed, qued at ' + Concurrency.limitXAtATimeQues[purpose].length);
                     }
                     console.log('OAAT_LIMX end limitXAtATime ' + purpose);
                 });
             });
             return dr;
+        });
+    }
+    static finishedLimitedJob(purpose, job) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield Concurrency.limitToOneAtATime('limitXAtATime_' + purpose, function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    console.log('OAAT_LIMX starting limitXAtATime ' + purpose);
+                    Concurrency.limitXAtATimeQues[purpose].splice(Concurrency.limitXAtATimeQues[purpose].indexOf(job), 1);
+                    console.log('OAAT_LIMX job removed from que');
+                    for (let i = 0; i < Concurrency.limitXAtATimeQues[purpose].length; i++) {
+                        if (!Concurrency.limitXAtATimeQues[purpose][i].started) {
+                            console.log('OAAT_LIMX delayd job being started');
+                            Concurrency.limitXAtATimeQues[purpose][i].run().then(() => {
+                                // remove from que after job is done and start any waiting jobs
+                                //console.log('delayed job finished, removing from que');
+                                Concurrency.finishedLimitedJob(purpose, Concurrency.limitXAtATimeQues[purpose][i]);
+                            });
+                            break;
+                        }
+                    }
+                    console.log('OAAT_LIMX end limitXAtATime ' + purpose);
+                });
+            });
         });
     }
     // -----------------

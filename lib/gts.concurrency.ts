@@ -60,6 +60,30 @@ class SequencedJobWaiting{
 	}
 }
 
+export class QuedJob<T>{
+	started:boolean;
+	subFunc:Function;
+	dRes:DelayedResult<T>;
+	constructor(f:Function, dr:DelayedResult<T>){
+		this.started = false;
+		this.subFunc = f;
+		this.dRes = dr;
+	}
+	public async run():Promise<void>{
+		this.started = true;
+		await this.subFunc();
+	}
+	public isStarted():boolean{
+		return this.started;
+	}
+	public async getResult():Promise<T>{
+        return this.dRes.getResult();
+    }
+	public reject(message:string):void{
+		this.dRes.reject(message);
+	}
+}
+
 // class to help make code that can be run concurrently
 export class Concurrency{
 
@@ -150,7 +174,7 @@ export class Concurrency{
 	private static limitXAtATimeQues: GTS.DM.HashTable<QuedJob<any>[]> = {};
 	
 	static async limitXAtATime<T>(purpose:string, fn:Function, ...args:any[]):Promise<DelayedResult<T>>{
-		if(!SecureCon.limitXAtATimeQues[purpose]){SecureCon.limitXAtATimeQues[purpose]=[];};
+		if(!Concurrency.limitXAtATimeQues[purpose]){Concurrency.limitXAtATimeQues[purpose]=[];};
 		// create a delayed result that gives a promise for when the job is run
 		var f:Function; var dr:DelayedResult<T>;
 		[f,dr] = await DelayedResult.createDelayedResult<T>(async function(resolve:Function):Promise<void>{
@@ -160,20 +184,40 @@ export class Concurrency{
 		let job:QuedJob<any> = new QuedJob(f,dr);
 		await Concurrency.limitToOneAtATime<void>('limitXAtATime_'+purpose, async function(){
 			console.log('OAAT_LIMX starting limitXAtATime '+purpose);
-			SecureCon.limitTenAtATimeQues[purpose].push(job);
-			if(SecureCon.limitTenAtATimeQues[purpose].length < 3){ //10){
-				console.log('OAAT_LIMX job qued at '+SecureCon.limitTenAtATimeQues[purpose].length+', starting now');
+			Concurrency.limitXAtATimeQues[purpose].push(job);
+			if(Concurrency.limitXAtATimeQues[purpose].length < 10){
+				console.log('OAAT_LIMX job qued at '+Concurrency.limitXAtATimeQues[purpose].length+', starting now');
 				job.run().then(()=>{
 					//console.log('job finished, removing from que');
 					// remove from que after job is done and start any waiting jobs
-					SecureCon.finishedLimitedJob(purpose, job);
+					Concurrency.finishedLimitedJob(purpose, job);
 				});
 			} else {
-				console.log('OAAT_LIMX job delayed, qued at '+SecureCon.limitTenAtATimeQues[purpose].length);
+				console.log('OAAT_LIMX job delayed, qued at '+Concurrency.limitXAtATimeQues[purpose].length);
 			}
 			console.log('OAAT_LIMX end limitXAtATime '+purpose);
 		});
 		return dr;
+	}
+	
+	static async finishedLimitedJob(purpose:string, job:any){
+		await Concurrency.limitToOneAtATime<void>('limitXAtATime_'+purpose, async function(){
+			console.log('OAAT_LIMX starting limitXAtATime '+purpose);
+			Concurrency.limitXAtATimeQues[purpose].splice(Concurrency.limitXAtATimeQues[purpose].indexOf(job),1);
+			console.log('OAAT_LIMX job removed from que');
+			for(let i:number = 0; i < Concurrency.limitXAtATimeQues[purpose].length; i++){
+				if(!Concurrency.limitXAtATimeQues[purpose][i].started){
+					console.log('OAAT_LIMX delayd job being started');
+					Concurrency.limitXAtATimeQues[purpose][i].run().then(()=>{
+						// remove from que after job is done and start any waiting jobs
+						//console.log('delayed job finished, removing from que');
+						Concurrency.finishedLimitedJob(purpose, Concurrency.limitXAtATimeQues[purpose][i]);
+					});
+					break;
+				}
+			}
+			console.log('OAAT_LIMX end limitXAtATime '+purpose);
+		});
 	}
 
 	// -----------------
