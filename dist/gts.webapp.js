@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Telegram = exports.fetchJSON = exports.getServerMAC = exports.WrappedResult = exports.WebResponse = exports.Encodec = exports.Secure = exports.DelayedResult = exports.Concurrency = exports.WS = exports.DBCore = exports.UUID = exports.GTS = void 0;
+exports.Telegram = exports.fetchJSON = exports.getServerMAC = exports.WrappedResult = exports.WebResponse = exports.Encodec = exports.Secure = exports.QuedJob = exports.DelayedResult = exports.Concurrency = exports.WS = exports.DBCore = exports.UUID = exports.GTS = void 0;
 const axios_1 = __importDefault(require("axios"));
 const getmac_1 = __importDefault(require("getmac"));
 const GTS = __importStar(require("./gts"));
@@ -47,6 +47,7 @@ exports.WS = __importStar(require("./gts.webserver"));
 var gts_concurrency_1 = require("./gts.concurrency");
 Object.defineProperty(exports, "Concurrency", { enumerable: true, get: function () { return gts_concurrency_1.Concurrency; } });
 Object.defineProperty(exports, "DelayedResult", { enumerable: true, get: function () { return gts_concurrency_1.DelayedResult; } });
+Object.defineProperty(exports, "QuedJob", { enumerable: true, get: function () { return gts_concurrency_1.QuedJob; } });
 exports.Secure = __importStar(require("./gts.secure"));
 exports.Encodec = __importStar(require("./gts.encodec"));
 // quicker reference to commly used types
