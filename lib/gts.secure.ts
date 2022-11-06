@@ -279,16 +279,16 @@ async function handleSecureTalk(web:WS.WebServerHelper, uuid:string, requestIp:s
 	let doLogSequenceCheck = true;
 	let retval:WS.WebResponse = new WS.WebResponse(false,'ERROR Unset return value',`UUID:${uuid} Unknown error`, '', []);
 	await Concurrency.doSequencedJob<WS.WebResponse>(sess.sessionId, iSequence, async function(purpose:string, seqNum:number, dbId:string):Promise<WS.WebResponse>{ // dbId:string is uuid as param to async func,  'talkSession'+ id for purpose
-		console.log('OAT_TALK talking at number #'+seqNum);
+		console.log('OAAT_SEQJOB talking at number #'+seqNum);
 		//console.log({pass:sess.password, nonce:sess.nonce+seqNum});
 		
 		// decrypt challenge using knownSaltPassHash and captcha
 		let decoded:string = Encodec.decrypt(message, sess.password, (sess.nonce+seqNum));
 		const [action,params] = JSON.parse(decoded);
-		console.log('OAT_TALK request received for '+action);
+		console.log('OAAT_SEQJOB request received for '+action);
 		
 		if(!web.adminHandlers[action]){
-			console.log('OAT_TALK reject, invalid admin action specified');
+			console.log('OAAT_SEQJOB reject, invalid admin action specified');
 			return new WS.WebResponse(false,'ERROR: Undefined admin action',`UUID:${dbId} Missing admin action {action}`,`""`,[]);
 		}
 		
@@ -450,7 +450,7 @@ export class Session{
 		let client:DBCore.Client = fetchConn.data;
 		const res = await client.query('CALL checkAndIncrementSessionSequence($1,$2,$3)',[sessionId,reqSequence,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'checkAndIncrementSessionSequence failed.' ); }
-		console.log({test:'compare talk sequence with db session store', sessionId:sessionId, reqSequence:reqSequence, seqDiff:res.rows[0].doseq});
+		//console.log({test:'compare talk sequence with db session store', sessionId:sessionId, reqSequence:reqSequence, seqDiff:res.rows[0].doseq});
 		if(res.rows[0].doseq==0){ return retval.setData("RunNow"); }
 		if(res.rows[0].doseq < 0 && res.rows[0].doseq >= -10){ return retval.setData("RunSoon"); }
 		return retval.setData("Invalid");

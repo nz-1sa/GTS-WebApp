@@ -304,14 +304,14 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         let retval = new WS.WebResponse(false, 'ERROR Unset return value', `UUID:${uuid} Unknown error`, '', []);
         yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, iSequence, function (purpose, seqNum, dbId) {
             return __awaiter(this, void 0, void 0, function* () {
-                console.log('OAT_TALK talking at number #' + seqNum);
+                console.log('OAAT_SEQJOB talking at number #' + seqNum);
                 //console.log({pass:sess.password, nonce:sess.nonce+seqNum});
                 // decrypt challenge using knownSaltPassHash and captcha
                 let decoded = Encodec.decrypt(message, sess.password, (sess.nonce + seqNum));
                 const [action, params] = JSON.parse(decoded);
-                console.log('OAT_TALK request received for ' + action);
+                console.log('OAAT_SEQJOB request received for ' + action);
                 if (!web.adminHandlers[action]) {
-                    console.log('OAT_TALK reject, invalid admin action specified');
+                    console.log('OAAT_SEQJOB reject, invalid admin action specified');
                     return new WS.WebResponse(false, 'ERROR: Undefined admin action', `UUID:${dbId} Missing admin action {action}`, `""`, []);
                 }
                 let adminResp = yield web.adminHandlers[action](dbId, requestIp, cookies, params);
@@ -543,7 +543,7 @@ class Session {
             if (res.rowCount == 0) {
                 return retval.setError('checkAndIncrementSessionSequence failed.');
             }
-            console.log({ test: 'compare talk sequence with db session store', sessionId: sessionId, reqSequence: reqSequence, seqDiff: res.rows[0].doseq });
+            //console.log({test:'compare talk sequence with db session store', sessionId:sessionId, reqSequence:reqSequence, seqDiff:res.rows[0].doseq});
             if (res.rows[0].doseq == 0) {
                 return retval.setData("RunNow");
             }
