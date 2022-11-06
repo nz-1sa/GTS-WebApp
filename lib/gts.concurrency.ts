@@ -117,11 +117,11 @@ export class Concurrency{
 				Concurrency.limitOneAtATimePromises[purpose] = Concurrency.limitOneAtATimePromises[purpose].then(
 					// do the job resolving the value being awaited on
 					async function(){
-						console.log('START ONE AT A TIME '+purpose);
+						//console.log('START ONE AT A TIME '+purpose);
 						let val:any = await fn(...args)
 							.catch((err:any)=>{console.log(err);errMsg='ERROR:'+err;})
 							.then((val:any)=>{resolve(val);});
-						console.log('END ONE AT A TIME '+purpose);
+						//console.log('END ONE AT A TIME '+purpose);
 					}
 				);
 			});
@@ -140,6 +140,40 @@ export class Concurrency{
 		}
 		//console.log('returning promise for job');
 		return dr!;		// return object wrapper of promise to wait for the job to be done
+	}
+
+	// -------------
+	// X AT A TIME
+	// -------------
+	
+	// allow limit on x at a time to be within a defined purpose
+	private static limitXAtATimeQues: GTS.DM.HashTable<QuedJob<any>[]> = {};
+	
+	static async limitXAtATime<T>(purpose:string, fn:Function, ...args:any[]):Promise<DelayedResult<T>>{
+		if(!SecureCon.limitXAtATimeQues[purpose]){SecureCon.limitXAtATimeQues[purpose]=[];};
+		// create a delayed result that gives a promise for when the job is run
+		var f:Function; var dr:DelayedResult<T>;
+		[f,dr] = await DelayedResult.createDelayedResult<T>(async function(resolve:Function):Promise<void>{
+			let r:T = await fn(...args);
+			resolve(r);
+		});
+		let job:QuedJob<any> = new QuedJob(f,dr);
+		await Concurrency.limitToOneAtATime<void>('limitXAtATime_'+purpose, async function(){
+			console.log('OAAT_LIMX starting limitXAtATime '+purpose);
+			SecureCon.limitTenAtATimeQues[purpose].push(job);
+			if(SecureCon.limitTenAtATimeQues[purpose].length < 3){ //10){
+				console.log('OAAT_LIMX job qued at '+SecureCon.limitTenAtATimeQues[purpose].length+', starting now');
+				job.run().then(()=>{
+					//console.log('job finished, removing from que');
+					// remove from que after job is done and start any waiting jobs
+					SecureCon.finishedLimitedJob(purpose, job);
+				});
+			} else {
+				console.log('OAAT_LIMX job delayed, qued at '+SecureCon.limitTenAtATimeQues[purpose].length);
+			}
+			console.log('OAAT_LIMX end limitXAtATime '+purpose);
+		});
+		return dr;
 	}
 
 	// -----------------
@@ -350,12 +384,14 @@ export class Concurrency{
 			drSyncSchedule = await Concurrency.limitToOneAtATime<DelayedResult<T>>(
 				'synchronousTalk_'+purpose,		// que identifier (can have multiple ques run in parallel)
 				async function(purp:string, seq:number, act:Function, actArgs:any[], sqChkIncr:Function, sqChkIncrArgs:any[]):Promise<DelayedResult<string>>{	// function to run when its turn comes in the que
+					console.log('OAAT_SEQJOB starting synchronousTalk_'+purpose);
 					if(!Concurrency.sequencedJobsWaiting[purp]){Concurrency.sequencedJobsWaiting[purp]={};}
 					let seqCheck:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
 					// Check if got and incremented sequence from db successfully
 					if(seqCheck.error){
-						console.log('SEQUENCED_JOB error checking and incrementing talk sequence in the db');
+						console.log('OAAT_SEQJOB error checking and incrementing talk sequence in the db');
 						console.log(seqCheck.message);
+						console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 						return Promise.reject('Error double checking sequence to talk in the db');
 					}
 					
@@ -371,25 +407,27 @@ export class Concurrency{
 								});
 								varsSet();
 							})
-							console.log('SEQUENCED_JOB Running job now '+purp+'_'+seq)
+							console.log('OAAT_SEQJOB Running job now '+purp+'_'+seq)
 							fDoResolveNow!();	// asynchronously start the job
 							// resolve any scheduled jobs that are ready to do
 							while(Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)){
 								let r:GTS.DM.WrappedResult<string> = await sqChkIncr!(purp,seq,...sqChkIncrArgs);
 								if(r.error){
-									console.log('SEQUENCED_JOB error checking and incrementing talk sequence in the db for qued job');
+									console.log('OAAT_SEQJOB error checking and incrementing talk sequence in the db for qued job');
 									console.log(r.message);
+									console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 									return Promise.reject('Error double checking sequence to talk in the db for qued job');
 								}
 								
 								console.log({runNextResult:r});
 								if(r.data=="RunNow"){
-									console.log('SEQUENCED_JOB Running waiting job');
+									console.log('OAAT_SEQJOB Running waiting job');
 									let s:SequencedJobWaiting = Concurrency.sequencedJobsWaiting[purp][seq];
 									s.startJob();
 									delete Concurrency.sequencedJobsWaiting[purp][seq];
 								}
-							} 
+							}
+							console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 							return drNow!;
 						case "RunSoon":
 							// the job at hand is due to run soon, schedule it to be done when the jobs required before it are started
@@ -408,17 +446,18 @@ export class Concurrency{
 								drSoon.reject('timedout');
 							});
 							Concurrency.sequencedJobsWaiting[purp][seq]=s;
-							console.log('SEQUENCED_JOB Qued to run soon '+purp+'_'+seq);
+							console.log('OAAT_SEQJOB Qued to run soon '+purp+'_'+seq);
 							// Put a timer on this, advance jobs have to arrive not just close in sequence, but close in time
 							global.setTimeout(s.timeoutJob, 5000);
-							
-							
+							console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 							return drSoon!;
 						case "Invalid":
-								console.log('SEQUENCED_JOB In Invalid '+purp+'_'+seq);
+								console.log('OAAT_SEQJOB In Invalid '+purp+'_'+seq);
+							console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 								return Promise.reject("Invalid Sequence.");
 						default:
-							console.log('SEQUENCED_JOB In default '+purp+'_'+seq+' '+seqCheck.data);
+							console.log('OAAT_SEQJOB In default '+purp+'_'+seq+' '+seqCheck.data);
+							console.log('OAAT_SEQJOB end synchronousTalk_'+purpose);
 							return Promise.reject("Unknown Result of Sequence Check.");
 					}
 					

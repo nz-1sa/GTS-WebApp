@@ -71,6 +71,7 @@ function getConnection(purpose, uuid) {
         // Require that only one thread can be opening a connection at a time, others will be qued
         let dr = yield gts_concurrency_1.Concurrency.limitToOneAtATime('openDbConnection', function (uuid) {
             return __awaiter(this, void 0, void 0, function* () {
+                console.log('OAAT_DBCON starting openDbConnection');
                 //console.log('getConnection - in one at a time');
                 // when a connection request comes out of the que, if the connection for the uuid has already been opened, return that open connection
                 let c = clientPool.openConnections[uuid];
@@ -98,23 +99,26 @@ function getConnection(purpose, uuid) {
                     clientPool.openConnections[uuid] = c; // store the client is open for the uuid
                     return new GTS.DM.WrappedResult().setData(c); // provide the connection to variable connResult
                 }
-                console.error(`${Date.now()} connection not got`); // return there was an error if we did not get a connection
+                console.error(`OAT_DBCON ${Date.now()} connection not got`); // return there was an error if we did not get a connection
                 return new GTS.DM.WrappedResult().setError('connection not got for db\r\n');
             });
         }, uuid);
         let connResult = yield dr.getResult();
         // We know have the result of opening the connection in connResult
         if (connResult.error) { // return to caller error info if there was an error opening the connection
-            console.error(`${Date.now()} error getting connection ${connResult.message}`);
+            console.error(`OAAT_DBCON ${Date.now()} error getting connection ${connResult.message}`);
             retval.setError(connResult.message);
+            console.log('OAAT_DBCON end openDbConnection');
             return retval;
         }
         if (connResult.data == null) { // return to caller there was an error if the connection returned is null
-            console.error(`${Date.now()} error got connection was null`);
+            console.error(`OAAT_DBCON ${Date.now()} error got connection was null`);
             retval.setError('Opening connection returned null');
+            console.log('OAAT_DBCON end openDbConnection');
             return retval;
         }
         client = connResult.data; // we now have a connection that didn't error, and is not null
+        console.log('OAAT_DBCON end openDbConnection');
         return retval.setData(client); // provide the connection to the caller
     });
 }

@@ -18,6 +18,8 @@ export declare class Concurrency {
     static pause(ms: number): Promise<void>;
     private static limitOneAtATimePromises;
     static limitToOneAtATime<T>(purpose: string, fn: Function, ...args: any[]): Promise<DelayedResult<T>>;
+    private static limitXAtATimeQues;
+    static limitXAtATime<T>(purpose: string, fn: Function, ...args: any[]): Promise<DelayedResult<T>>;
     static startCancellableDelay(ms: number): Promise<CancellableDelay>;
     static doFuncOrTimeout<T>(timeout: number, action: Function): Promise<[T, boolean]>;
     static throttleJob<T>(minDuration: number, action: Function): Promise<T>;

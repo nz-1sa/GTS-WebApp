@@ -145,11 +145,11 @@ class Concurrency {
                             // do the job resolving the value being awaited on
                             function () {
                                 return __awaiter(this, void 0, void 0, function* () {
-                                    console.log('START ONE AT A TIME ' + purpose);
+                                    //console.log('START ONE AT A TIME '+purpose);
                                     let val = yield fn(...args)
                                         .catch((err) => { console.log(err); errMsg = 'ERROR:' + err; })
                                         .then((val) => { resolve(val); });
-                                    console.log('END ONE AT A TIME ' + purpose);
+                                    //console.log('END ONE AT A TIME '+purpose);
                                 });
                             });
                         });
@@ -170,6 +170,43 @@ class Concurrency {
             }
             //console.log('returning promise for job');
             return dr; // return object wrapper of promise to wait for the job to be done
+        });
+    }
+    static limitXAtATime(purpose, fn, ...args) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!SecureCon.limitXAtATimeQues[purpose]) {
+                SecureCon.limitXAtATimeQues[purpose] = [];
+            }
+            ;
+            // create a delayed result that gives a promise for when the job is run
+            var f;
+            var dr;
+            [f, dr] = yield DelayedResult.createDelayedResult(function (resolve) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    let r = yield fn(...args);
+                    resolve(r);
+                });
+            });
+            let job = new QuedJob(f, dr);
+            yield Concurrency.limitToOneAtATime('limitXAtATime_' + purpose, function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    console.log('OAAT_LIMX starting limitXAtATime ' + purpose);
+                    SecureCon.limitTenAtATimeQues[purpose].push(job);
+                    if (SecureCon.limitTenAtATimeQues[purpose].length < 3) { //10){
+                        console.log('OAAT_LIMX job qued at ' + SecureCon.limitTenAtATimeQues[purpose].length + ', starting now');
+                        job.run().then(() => {
+                            //console.log('job finished, removing from que');
+                            // remove from que after job is done and start any waiting jobs
+                            SecureCon.finishedLimitedJob(purpose, job);
+                        });
+                    }
+                    else {
+                        console.log('OAAT_LIMX job delayed, qued at ' + SecureCon.limitTenAtATimeQues[purpose].length);
+                    }
+                    console.log('OAAT_LIMX end limitXAtATime ' + purpose);
+                });
+            });
+            return dr;
         });
     }
     // -----------------
@@ -379,14 +416,16 @@ class Concurrency {
                     drSyncSchedule = yield Concurrency.limitToOneAtATime('synchronousTalk_' + purpose, // que identifier (can have multiple ques run in parallel)
                     function (purp, seq, act, actArgs, sqChkIncr, sqChkIncrArgs) {
                         return __awaiter(this, void 0, void 0, function* () {
+                            console.log('OAAT_SEQJOB starting synchronousTalk_' + purpose);
                             if (!Concurrency.sequencedJobsWaiting[purp]) {
                                 Concurrency.sequencedJobsWaiting[purp] = {};
                             }
                             let seqCheck = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                             // Check if got and incremented sequence from db successfully
                             if (seqCheck.error) {
-                                console.log('SEQUENCED_JOB error checking and incrementing talk sequence in the db');
+                                console.log('OAAT_SEQJOB error checking and incrementing talk sequence in the db');
                                 console.log(seqCheck.message);
+                                console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                 return Promise.reject('Error double checking sequence to talk in the db');
                             }
                             switch (seqCheck.data) {
@@ -405,24 +444,26 @@ class Concurrency {
                                             varsSet();
                                         });
                                     });
-                                    console.log('SEQUENCED_JOB Running job now ' + purp + '_' + seq);
+                                    console.log('OAAT_SEQJOB Running job now ' + purp + '_' + seq);
                                     fDoResolveNow(); // asynchronously start the job
                                     // resolve any scheduled jobs that are ready to do
                                     while (Concurrency.sequencedJobsWaiting[purp].hasOwnProperty(++seq)) {
                                         let r = yield sqChkIncr(purp, seq, ...sqChkIncrArgs);
                                         if (r.error) {
-                                            console.log('SEQUENCED_JOB error checking and incrementing talk sequence in the db for qued job');
+                                            console.log('OAAT_SEQJOB error checking and incrementing talk sequence in the db for qued job');
                                             console.log(r.message);
+                                            console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                             return Promise.reject('Error double checking sequence to talk in the db for qued job');
                                         }
                                         console.log({ runNextResult: r });
                                         if (r.data == "RunNow") {
-                                            console.log('SEQUENCED_JOB Running waiting job');
+                                            console.log('OAAT_SEQJOB Running waiting job');
                                             let s = Concurrency.sequencedJobsWaiting[purp][seq];
                                             s.startJob();
                                             delete Concurrency.sequencedJobsWaiting[purp][seq];
                                         }
                                     }
+                                    console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                     return drNow;
                                 case "RunSoon":
                                     // the job at hand is due to run soon, schedule it to be done when the jobs required before it are started
@@ -445,15 +486,18 @@ class Concurrency {
                                         drSoon.reject('timedout');
                                     });
                                     Concurrency.sequencedJobsWaiting[purp][seq] = s;
-                                    console.log('SEQUENCED_JOB Qued to run soon ' + purp + '_' + seq);
+                                    console.log('OAAT_SEQJOB Qued to run soon ' + purp + '_' + seq);
                                     // Put a timer on this, advance jobs have to arrive not just close in sequence, but close in time
                                     global.setTimeout(s.timeoutJob, 5000);
+                                    console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                     return drSoon;
                                 case "Invalid":
-                                    console.log('SEQUENCED_JOB In Invalid ' + purp + '_' + seq);
+                                    console.log('OAAT_SEQJOB In Invalid ' + purp + '_' + seq);
+                                    console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                     return Promise.reject("Invalid Sequence.");
                                 default:
-                                    console.log('SEQUENCED_JOB In default ' + purp + '_' + seq + ' ' + seqCheck.data);
+                                    console.log('OAAT_SEQJOB In default ' + purp + '_' + seq + ' ' + seqCheck.data);
+                                    console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                     return Promise.reject("Unknown Result of Sequence Check.");
                             }
                         });
@@ -505,6 +549,11 @@ exports.Concurrency = Concurrency;
 // -------------
 // allow limit on concurrency to be within a defined purpose
 Concurrency.limitOneAtATimePromises = {};
+// -------------
+// X AT A TIME
+// -------------
+// allow limit on x at a time to be within a defined purpose
+Concurrency.limitXAtATimeQues = {};
 // -------
 // DO ONCE
 // -------
