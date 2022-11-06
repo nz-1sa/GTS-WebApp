@@ -503,7 +503,7 @@ class Concurrency {
                                             console.log('OAAT_SEQJOB end synchronousTalk_' + purpose);
                                             return Promise.reject('Error double checking sequence to talk in the db for qued job');
                                         }
-                                        console.log({ runNextResult: r });
+                                        //console.log({runNextResult:r});
                                         if (r.data == "RunNow") {
                                             console.log('OAAT_SEQJOB Running waiting job');
                                             let s = Concurrency.sequencedJobsWaiting[purp][seq];

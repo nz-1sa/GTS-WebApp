@@ -75,7 +75,7 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 	// pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
 	let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
 	//console.log('established session object');
-	console.log({sessionIs:uuid});
+	console.log('handleStartSessionRequest yields session '+uuid);
 	ns.addToDB(uuid);
 	//console.log('session added to db');
 	ns.initialiseCaptcha(uuid, sessionId);
@@ -230,7 +230,7 @@ async function handleSequenceRequest(uuid:string, requestIp:string, cookies:GTS.
 		return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, request to old.`,'', []);
 	}
 	
-	console.log({sequence:sess.seq});
+	console.log('handleSequenceRequest yields '+sess.seq);
 
 	// encrypt and return to client the current sequence to use for talking, and a date check of the response
 	let plainTextResponse =  new Date().getTime().toString()+JSON.stringify({seq:sess.seq.toString()});
