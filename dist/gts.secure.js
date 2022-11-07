@@ -542,7 +542,8 @@ class Session {
                 return retval.setError('Session not found.');
             }
             let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonceBase, res.rows[0].logoutSeed, res.rows[0].seqReqSeed, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
-            //console.log('got session object from db');
+            console.log('got session object from db');
+            console.log(s);
             //TODO: update last seen
             return retval.setData(s);
         });

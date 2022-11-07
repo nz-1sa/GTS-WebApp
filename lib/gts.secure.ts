@@ -447,7 +447,8 @@ export class Session{
 		//console.log('awaited db query');
 		if( res.rowCount == 0 ) { console.log('session not found.'); return retval.setError( 'Session not found.' ); }
 		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonceBase, res.rows[0].logoutSeed, res.rows[0].seqReqSeed, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
-		//console.log('got session object from db');
+		console.log('got session object from db');
+		console.log(s);
 		//TODO: update last seen
 		return retval.setData( s );
 	}
@@ -639,9 +640,11 @@ export class Session{
 	static async hasSession(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>): Promise<[boolean,Session?]>{
 		if(!cookies['session']){ console.log('no session cookie at hasSession check'); return [false,undefined]; }
 		if(cookies['session'].length != 36){ console.log('incorrect session length at hasSession check'); return [false,undefined]; }
+		
 		let ws:GTS.DM.WrappedResult<Session> = await Session.getSessionFromDB(uuid, cookies['session']);
 		if( ws.error ) { console.log('failed to get session from db '+ws.message ); return [false,undefined];}
 		if( ws.data == null ) { console.log('null session from db'); return [false,undefined]; }
+		
 		let s: Session = ws.data;
 		if(s.ip != requestIp){ console.log('ip mismatch at hasSession check'); return [false,undefined]; }
 		if(s.status == SessionStatus.Expired){ console.log('expired session at hasSession check'); return [false,undefined]; }
