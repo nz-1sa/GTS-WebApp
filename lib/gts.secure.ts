@@ -212,6 +212,9 @@ async function handleSequenceRequest(uuid:string, requestIp:string, cookies:GTS.
 		return new WS.WebResponse(false, "ERROR: Can only get session after loggin in", `UUID:${uuid} curSeq called before login.`,'', []);
 	}
 	
+	console.log('decoding seq request with');
+	console.log({p:sess.password, s:sess.seqReqSeed});
+	
 	// decrypt challenge using session password and seqReqSeed instead of sequence (cant expect them to know the sequence if calling curSeq)
 	let decoded:string = Encodec.decrypt(challenge, sess.password, sess.seqReqSeed);
 	
