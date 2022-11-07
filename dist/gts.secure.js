@@ -333,7 +333,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             console.log('sequence talk error');
             console.log(err);
             let errMsg = '';
-            if (err.startsWith('Seq Check Error')) {
+            if (err.startsWith && err.startsWith('Seq Check Error')) {
                 errMsg = 'ERROR: Seq Check Error';
             }
             else if (err == 'timedout') {
