@@ -107,8 +107,8 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
             return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
         }
         //console.log('got session id');
-        // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonce:number, pPassword:string, pSeq:string, pChkSum:string
-        let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
+        // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonceBase:number, pLogoutSeed:number, pSeqReqSeed:number, pPassword:string, pSeq:string, pChkSum:string
+        let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 1, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
         //console.log('established session object');
         console.log('handleStartSessionRequest yields session ' + uuid);
         ns.addToDB(uuid);
@@ -161,16 +161,18 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
             console.log('failed Date check');
             return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, request to old.`, '', []);
         }
-        // generate password and nonce for the session
+        // generate password and nonce base (offset) for the session
         //console.log('setting session credentials');
         sess.status = SessionStatus.LoggedIn;
         sess.password = yield Session.genSessionPassword();
-        sess.nonce = Math.floor(1 + Math.random() * 483600);
+        sess.nonceBase = Math.floor(1 + Math.random() * 483600);
+        sess.logoutSeed = Math.floor(1 + Math.random() * 483600);
+        sess.seqReqSeed = Math.floor(1 + Math.random() * 483600);
         sess.seq = 1;
         sess.updateDB(uuid);
         //console.log({sess:sess});
-        // encrypt and return to client the password to use for the session, and the nonce to start with
-        let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ pass: sess.password, nonce: sess.nonce });
+        // encrypt and return to client the password to use for the session, and the nonce base to start sequence from
+        let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ p: sess.password, n: sess.nonceBase, l: sess.logoutSeed, r: sess.seqReqSeed });
         //console.log({plainTextResponse:plainTextResponse});
         let encResponse = Encodec.encrypt(plainTextResponse, knownSaltPassHash, sess.captcha);
         //console.log({encResponse:encResponse});
@@ -193,8 +195,8 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         if (sess.status != SessionStatus.LoggedIn) {
             return new WS.WebResponse(false, "ERROR: Can only logout after loggin in", `UUID:${uuid} Logout called before login.`, '', []);
         }
-        // decrypt challenge using session password and 0 for sequence (allows always to logout, even if lose track of sequence at client)
-        let decoded = Encodec.decrypt(challenge, sess.password, 0);
+        // decrypt challenge using session password and logoutSeed instead of sequence (allows always to logout, even if lose track of sequence at client)
+        let decoded = Encodec.decrypt(challenge, sess.password, sess.logoutSeed);
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
             console.log('failed regex check');
             return new WS.WebResponse(false, "ERROR: Logout failed.", `UUID:${uuid} Logout failed, decoded content failed regex check.`, '', []);
@@ -216,7 +218,7 @@ function handleLogoutRequest(uuid, requestIp, cookies, challenge) {
         // encrypt and return to client the current time to allow checking for valid response
         let plainTextResponse = new Date().getTime().toString();
         //console.log({plainTextResponse:plainTextResponse});
-        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
+        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, sess.logoutSeed);
         //console.log({encResponse:encResponse});
         return new WS.WebResponse(true, "", `UUID:${uuid} Logout success`, `"${encResponse}"`);
     });
@@ -236,8 +238,8 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
         if (sess.status != SessionStatus.LoggedIn) {
             return new WS.WebResponse(false, "ERROR: Can only get session after loggin in", `UUID:${uuid} curSeq called before login.`, '', []);
         }
-        // decrypt challenge using session password and 0 for sequence (cant expect them to know the sequence if calling curSeq)
-        let decoded = Encodec.decrypt(challenge, sess.password, 0);
+        // decrypt challenge using session password and seqReqSeed instead of sequence (cant expect them to know the sequence if calling curSeq)
+        let decoded = Encodec.decrypt(challenge, sess.password, sess.seqReqSeed);
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
             console.log('failed regex check');
             return new WS.WebResponse(false, "ERROR: Request Sequence failed.", `UUID:${uuid} curSeq failed, decoded content failed regex check.`, '', []);
@@ -258,7 +260,7 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
         // encrypt and return to client the current sequence to use for talking, and a date check of the response
         let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ seq: sess.seq.toString() });
         //console.log({plainTextResponse:plainTextResponse});
-        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, 0);
+        let encResponse = Encodec.encrypt(plainTextResponse, sess.password, sess.seqReqSeed);
         //console.log({encResponse:encResponse});
         return new WS.WebResponse(true, "", `UUID:${uuid} curSeq success`, `"${encResponse}"`);
     });
@@ -305,9 +307,9 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
         yield gts_concurrency_1.Concurrency.doSequencedJob(sess.sessionId, iSequence, function (purpose, seqNum, dbId) {
             return __awaiter(this, void 0, void 0, function* () {
                 console.log('OAAT_SEQJOB talking at number #' + seqNum);
-                //console.log({pass:sess.password, nonce:sess.nonce+seqNum});
+                //console.log({pass:sess.password, nonce:sess.nonceBase+seqNum});
                 // decrypt challenge using knownSaltPassHash and captcha
-                let decoded = Encodec.decrypt(message, sess.password, (sess.nonce + seqNum));
+                let decoded = Encodec.decrypt(message, sess.password, (sess.nonceBase + seqNum));
                 const [action, params] = JSON.parse(decoded);
                 console.log('OAAT_SEQJOB request received for ' + action);
                 if (!web.adminHandlers[action]) {
@@ -323,7 +325,7 @@ function handleSecureTalk(web, uuid, requestIp, cookies, sequence, message) {
             // WS.WebResponse(pSuccess:boolean, pErrorMessage:string, pLogMessage:string, pData:string, pSetCookies?: Cookie[])
             .then((adminResponse) => {
             let plainTextResponse = new Date().getTime().toString() + adminResponse.toString();
-            retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(plainTextResponse, sess.password, (sess.nonce + iSequence))}"`, []);
+            retval = new WS.WebResponse(true, '', `UUID:${uuid} Secure Talk done`, `"${Encodec.encrypt(plainTextResponse, sess.password, (sess.nonceBase + iSequence))}"`, []);
         })
             .catch((err) => {
             console.log('sequence talk error');
@@ -352,7 +354,7 @@ var SessionStatus;
     SessionStatus[SessionStatus["Expired"] = 4] = "Expired";
 })(SessionStatus = exports.SessionStatus || (exports.SessionStatus = {}));
 class Session {
-    constructor(pId, pSessionId, pCreated, pLastSeen, pIp, pStatus, pCaptcha, pNonce, pPassword, pSeq, pChkSum) {
+    constructor(pId, pSessionId, pCreated, pLastSeen, pIp, pStatus, pCaptcha, pNonceBase, pLogoutSeed, pSeqReqSeed, pPassword, pSeq, pChkSum) {
         this.id = pId;
         this.sessionId = pSessionId;
         this.created = pCreated;
@@ -360,14 +362,16 @@ class Session {
         this.ip = pIp;
         this.status = pStatus;
         this.captcha = pCaptcha;
-        this.nonce = pNonce;
+        this.nonceBase = pNonceBase;
+        this.logoutSeed = pLogoutSeed;
+        this.seqReqSeed = pSeqReqSeed;
         this.password = pPassword;
         this.seq = pSeq;
         this.chkSum = pChkSum;
     }
     // base64 sha1 hash of the session's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
     genHash() {
-        var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status, captcha: this.captcha, nonce: this.nonce, password: this.password, seq: this.seq });
+        var j = JSON.stringify({ sessionId: this.sessionId, created: this.created, lastSeen: this.lastSeen, ip: this.ip, status: this.status, captcha: this.captcha, nonceBase: this.nonceBase, logoutSeed: this.logoutSeed, seqReqSeed: this.seqReqSeed, password: this.password, seq: this.seq });
         var hsh = crypto.createHash('sha1').update(j).digest('base64');
         return hsh;
     }
@@ -377,7 +381,7 @@ class Session {
     }
     // cast session as a JSON object
     toJSON() {
-        return { id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), captcha: this.captcha.toString(), nonce: this.nonce.toString(), password: this.password, seq: this.seq.toString(), chkSum: this.chkSum };
+        return { id: this.id.toString(), sessionId: this.sessionId, created: this.created.toString(), lastSeen: this.lastSeen.toString(), ip: this.ip, status: this.status.toString(), captcha: this.captcha.toString(), nonceBase: this.nonceBase.toString(), logoutSeed: this.logoutSeed.toString(), seqReqSeed: this.seqReqSeed.toString(), password: this.password, seq: this.seq.toString(), chkSum: this.chkSum };
     }
     // casted value checks for allowed values in a session
     verifyValuesAreValid() {
@@ -431,12 +435,26 @@ class Session {
             }
             errDesc = errDesc + 'Invalid value for captcha.';
         }
-        var nonceIsValid = (this.nonce >= 1 && this.nonce <= 2147483600);
-        if (!nonceIsValid) {
+        var nonceBaseIsValid = (this.nonceBase >= 1 && this.nonceBase <= 2147483600);
+        if (!nonceBaseIsValid) {
             if (errDesc.length > 0) {
                 errDesc = errDesc + ' ';
             }
-            errDesc = errDesc + 'Invalid value for nonce.';
+            errDesc = errDesc + 'Invalid value for nonceBase.';
+        }
+        var logoutSeedIsValid = (this.logoutSeed >= 1 && this.logoutSeed <= 2147483600);
+        if (!logoutSeedIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for logoutSeed.';
+        }
+        var seqReqSeedIsValid = (this.seqReqSeed >= 1 && this.seqReqSeed <= 2147483600);
+        if (!seqReqSeedIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for seqReqSeed.';
         }
         var passwordIsValid = (this.password.length >= 16 && this.password.length <= 16);
         if (!passwordIsValid) {
@@ -459,14 +477,14 @@ class Session {
             }
             errDesc = errDesc + 'Invalid value for chkSum.';
         }
-        return [idIsValid && sessionIdIsValid && createdIsValid && lastSeenIsValid && ipIsValid && statusIsValid && captchaIsValid && nonceIsValid && passwordIsValid && seqIsValid && chkSumIsValid, errDesc];
+        return [idIsValid && sessionIdIsValid && createdIsValid && lastSeenIsValid && ipIsValid && statusIsValid && captchaIsValid && nonceBaseIsValid && passwordIsValid && seqIsValid && chkSumIsValid, errDesc];
     }
     // instantiate a session from string values. Null returned if sting values fail regex checks or casted value checks
-    static fromStrings(id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum) {
-        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(sessionId), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(created), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(lastSeen), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(ip), new RegExp("^[0-9]+$", "g").test(status), new RegExp("^[0-9]+$", "g").test(captcha), new RegExp("^[0-9]+$", "g").test(nonce), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(password), new RegExp("^[0-9]+$", "g").test(seq), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+    static fromStrings(id, sessionId, created, lastSeen, ip, status, captcha, nonceBase, logoutSeed, seqReqSeed, password, seq, chkSum) {
+        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(sessionId), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(created), new RegExp("^[0-9]{4}-[0-9]{2}-[0-9][0-9]? [0-9]{2}:[0-9]{2}(?::[0-9]{2})$", "g").test(lastSeen), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(ip), new RegExp("^[0-9]+$", "g").test(status), new RegExp("^[0-9]+$", "g").test(captcha), new RegExp("^[0-9]+$", "g").test(nonceBase), new RegExp("^[0-9]+$", "g").test(logoutSeed), new RegExp("^[0-9]+$", "g").test(seqReqSeed), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(password), new RegExp("^[0-9]+$", "g").test(seq), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
         if (!regexTests.every(Boolean)) {
             // detail invalid value
-            let paramNames = ["id", "sessionId", "created", "lastSeen", "ip", "status", "captcha", "nonce", "password", "seq", "chkSum"];
+            let paramNames = ["id", "sessionId", "created", "lastSeen", "ip", "status", "captcha", "nonceBase", "logoutSeed", "seqReqSeed", "password", "seq", "chkSum"];
             for (var i = 0; i < regexTests.length; i++) {
                 if (!regexTests[i]) {
                     console.log('posted value for ' + paramNames[i] + ' fails regex check');
@@ -474,7 +492,7 @@ class Session {
             }
             return null;
         }
-        let session = new Session(parseInt(id), (sessionId), new Date(created), new Date(lastSeen), (ip), parseInt(status), parseInt(captcha), parseInt(nonce), (password), parseInt(seq), (chkSum));
+        let session = new Session(parseInt(id), (sessionId), new Date(created), new Date(lastSeen), (ip), parseInt(status), parseInt(captcha), parseInt(nonceBase), parseInt(logoutSeed), parseInt(seqReqSeed), (password), parseInt(seq), (chkSum));
         let valueCheck = session.verifyValuesAreValid();
         let success = valueCheck[0];
         if (success) {
@@ -515,13 +533,13 @@ class Session {
             }
             let client = fetchConn.data;
             //console.log('got db client');
-            const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
+            const res = yield client.query('SELECT id, created, lastSeen, ip, status, captcha, nonceBase, logoutSeed, seqReqSeed, password, seq, chkSum FROM sessions WHERE sessionId = $1;', [sessionId]);
             //console.log('awaited db query');
             if (res.rowCount == 0) {
                 console.log('session not found.');
                 return retval.setError('Session not found.');
             }
-            let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonce, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
+            let s = new Session(res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonceBase, res.rows[0].logoutSeed, res.rows[0].seqReqSeed, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
             //console.log('got session object from db');
             //TODO: update last seen
             return retval.setData(s);
@@ -566,12 +584,12 @@ class Session {
                 return retval.setError('DB Connection NULL error');
             }
             let client = fetchConn.data;
-            const res = yield client.query('SELECT id, sessionId, created, lastSeen, ip, status, captcha, nonce, password, seq, chkSum FROM sessions;');
+            const res = yield client.query('SELECT id, sessionId, created, lastSeen, ip, status, captcha, nonceBase, logoutSeed, seqReqSeed, password, seq, chkSum FROM sessions;');
             if (res.rowCount == 0) {
                 return retval.setData(retvalData);
             } // handle empty table
             for (let i = 0; i < res.rowCount; i++) {
-                retvalData.push(new Session(res.rows[i].id, res.rows[i].sessionid, res.rows[i].created, res.rows[i].lastseen, res.rows[i].ip, res.rows[i].status, res.rows[i].captcha, res.rows[i].nonce, res.rows[i].password, res.rows[i].seq, res.rows[i].chksum));
+                retvalData.push(new Session(res.rows[i].id, res.rows[i].sessionid, res.rows[i].created, res.rows[i].lastseen, res.rows[i].ip, res.rows[i].status, res.rows[i].captcha, res.rows[0].nonceBase, res.rows[0].logoutSeed, res.rows[0].seqReqSeed, res.rows[i].password, res.rows[i].seq, res.rows[i].chksum));
             }
             return retval.setData(retvalData);
         });
@@ -589,7 +607,7 @@ class Session {
             }
             let client = fetchConn.data;
             this.chkSum = this.genHash();
-            const res = yield client.query('CALL addSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);', [this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, this.seq, this.chkSum, 0]);
+            const res = yield client.query('CALL addSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);', [this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonceBase, this.logoutSeed, this.seqReqSeed, this.password, this.seq, this.chkSum, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not added.');
             }
@@ -610,7 +628,7 @@ class Session {
             }
             let client = fetchConn.data;
             let newChksum = this.genHash();
-            const res = yield client.query('CALL updateSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13);', [this.id, this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonce, this.password, this.seq, newChksum, this.chkSum, 0]);
+            const res = yield client.query('CALL updateSession($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15);', [this.id, this.sessionId, this.created, this.lastSeen, this.ip, this.status, this.captcha, this.nonceBase, this.logoutSeed, this.seqReqSeed, this.password, this.seq, newChksum, this.chkSum, 0]);
             if (res.rowCount == 0) {
                 return retval.setError('Session not updated. 0 row count.');
             }
