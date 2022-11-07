@@ -446,7 +446,7 @@ export class Session{
 		const res = await client.query( 'SELECT id, created, lastSeen, ip, status, captcha, nonceBase, logoutSeed, seqReqSeed, password, seq, chkSum FROM sessions WHERE sessionId = $1;',[sessionId] );
 		//console.log('awaited db query');
 		if( res.rowCount == 0 ) { console.log('session not found.'); return retval.setError( 'Session not found.' ); }
-		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].nonceBase, res.rows[0].logoutSeed, res.rows[0].seqReqSeed, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
+		let s:Session = new Session( res.rows[0].id, sessionId, res.rows[0].created, res.rows[0].lastseen, res.rows[0].ip, res.rows[0].status, res.rows[0].captcha, res.rows[0].noncebase, res.rows[0].logoutseed, res.rows[0].seqreqseed, res.rows[0].password, res.rows[0].seq, res.rows[0].chksum);
 		console.log('got session object from db');
 		console.log(s);
 		//TODO: update last seen
