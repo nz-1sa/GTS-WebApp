@@ -52,11 +52,10 @@ function attachWebInterface(web, webapp) {
             return yield handleStartSessionRequest(uuid, requestIp, cookies);
         });
     });
-    // login by email, password, and captcha
-    //TODO: email should be SHA1 hash
-    web.registerHandlerPost(webapp, '/api/login', ['email', 'challenge'], function (uuid, requestIp, cookies, email, challenge) {
+    // login by ident, password, and captcha
+    web.registerHandlerPost(webapp, '/api/login', ['ident', 'challenge'], function (uuid, requestIp, cookies, ident, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield handleLoginRequest(uuid, requestIp, cookies, email, challenge);
+            return yield handleLoginRequest(uuid, requestIp, cookies, ident, challenge);
         });
     });
     // log out of account
@@ -119,7 +118,7 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
     });
 }
 // process login for a session
-function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
+function handleLoginRequest(uuid, requestIp, cookies, ident, challenge) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log('in handleLoginRequest');
         // check that there is an open session to log in to
@@ -138,7 +137,7 @@ function handleLoginRequest(uuid, requestIp, cookies, email, challenge) {
             console.log('wrong session state, only can login from Initialised');
             return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
         }
-        //TODO: get knownSaltPassHash for email address from database
+        //TODO: get knownSaltPassHash for ident from database
         let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI='; //knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
         //console.log('using debug key to decode');
         //console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
@@ -238,8 +237,8 @@ function handleSequenceRequest(uuid, requestIp, cookies, challenge) {
         if (sess.status != SessionStatus.LoggedIn) {
             return new WS.WebResponse(false, "ERROR: Can only get session after loggin in", `UUID:${uuid} curSeq called before login.`, '', []);
         }
-        console.log('decoding seq request with');
-        console.log({ p: sess.password, s: sess.seqReqSeed });
+        //console.log('decoding seq request with');
+        //console.log({p:sess.password, s:sess.seqReqSeed});
         // decrypt challenge using session password and seqReqSeed instead of sequence (cant expect them to know the sequence if calling curSeq)
         let decoded = Encodec.decrypt(challenge, sess.password, sess.seqReqSeed);
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {

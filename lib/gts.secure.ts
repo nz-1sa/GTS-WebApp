@@ -22,10 +22,9 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 		return await handleStartSessionRequest(uuid, requestIp, cookies);
 	});
 	
-	// login by email, password, and captcha
-	//TODO: email should be SHA1 hash
-	web.registerHandlerPost(webapp, '/api/login', ['email','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string){
-		return await handleLoginRequest(uuid, requestIp, cookies, email, challenge);
+	// login by ident, password, and captcha
+	web.registerHandlerPost(webapp, '/api/login', ['ident','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, ident:string, challenge:string){
+		return await handleLoginRequest(uuid, requestIp, cookies, ident, challenge);
 	});
 	
 	// log out of account
@@ -84,7 +83,7 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 }
 
 // process login for a session
-async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, email:string, challenge:string):Promise<WS.WebResponse>{
+async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, ident:string, challenge:string):Promise<WS.WebResponse>{
 	console.log('in handleLoginRequest');
 	// check that there is an open session to log in to
 	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
@@ -103,7 +102,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 		return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
 	}
 	
-	//TODO: get knownSaltPassHash for email address from database
+	//TODO: get knownSaltPassHash for ident from database
 	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
 	
 	//console.log('using debug key to decode');
@@ -212,8 +211,8 @@ async function handleSequenceRequest(uuid:string, requestIp:string, cookies:GTS.
 		return new WS.WebResponse(false, "ERROR: Can only get session after loggin in", `UUID:${uuid} curSeq called before login.`,'', []);
 	}
 	
-	console.log('decoding seq request with');
-	console.log({p:sess.password, s:sess.seqReqSeed});
+	//console.log('decoding seq request with');
+	//console.log({p:sess.password, s:sess.seqReqSeed});
 	
 	// decrypt challenge using session password and seqReqSeed instead of sequence (cant expect them to know the sequence if calling curSeq)
 	let decoded:string = Encodec.decrypt(challenge, sess.password, sess.seqReqSeed);
