@@ -109,6 +109,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 		console.log('wrong email ident');
 		return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, incorrect email ident`,'', []);
 	}
+	console.log(la);
 	let accountSessionId:string = la.data![1];
 	if(accountSessionId.length > 0){
 		if(accountSessionId == sess.sessionId){
