@@ -115,7 +115,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 			// error, how can account be assigned to us when we are not logged in yet (trying to do so)
 		} else {
 			console.log('login already attached to a different session');
-			GTS.DM.WrappedResult<Session> rs = await getSessionFromDB(uuid, accountSessionId);
+			let rs:GTS.DM.WrappedResult<Session> = await getSessionFromDB(uuid, accountSessionId);
 			if(rs.error){
 				console.log('error getting attached session');
 				console.log(rs.message);
