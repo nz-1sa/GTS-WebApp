@@ -167,7 +167,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	//console.log({sess:sess});
 	
 	// show that the login is in use
-	LoginAccount.setActiveSessionId(uuid,identsess.sessionId);
+	LoginAccount.setActiveSessionId(uuid,ident,sess.sessionId);
 	
 	// encrypt and return to client the password to use for the session, and the nonce base to start sequence from
 	let plainTextResponse = new Date().getTime().toString()+JSON.stringify({p:sess.password, n:sess.nonceBase, l:sess.logoutSeed, r:sess.seqReqSeed});
