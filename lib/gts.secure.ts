@@ -166,6 +166,9 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	sess.updateDB(uuid);
 	//console.log({sess:sess});
 	
+	// show that the login is in use
+	LoginAccount.setActiveSessionId(uuid,identsess.sessionId);
+	
 	// encrypt and return to client the password to use for the session, and the nonce base to start sequence from
 	let plainTextResponse = new Date().getTime().toString()+JSON.stringify({p:sess.password, n:sess.nonceBase, l:sess.logoutSeed, r:sess.seqReqSeed});
 	//console.log({plainTextResponse:plainTextResponse});
@@ -838,5 +841,16 @@ export class LoginAccount{
 		const res = await client.query( 'SELECT passhash, activesessionid FROM loginAccounts WHERE ident = $1;',[ident] );
 		if( res.rowCount == 0 ) { return retval.setError( 'Account not found.' ); }
 		return retval.setData( [res.rows[0].passhash, res.rows[0].activesessionid] );
+	}
+	
+	static async setActiveSessionId(uuid:string, ident:string, activesessionid:string): Promise<GTS.DM.WrappedResult<void>>{
+		let retval: GTS.DM.WrappedResult<void> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.getPassHash', uuid );
+		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		const res = await client.query( 'UPDATE loginaccounts SET activesessionid=$1 WHERE ident=$2;',[activesessionid,ident]);
+		if( res.rowCount == 0 ) { return retval.setError( 'LoginAccount not added.' ); }
+		return retval.setData();
 	}
 }
