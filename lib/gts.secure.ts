@@ -837,6 +837,6 @@ export class LoginAccount{
 		let client:DBCore.Client = fetchConn.data;
 		const res = await client.query( 'SELECT passhash, activesessionid FROM loginAccounts WHERE ident = $1;',[ident] );
 		if( res.rowCount == 0 ) { return retval.setError( 'Account not found.' ); }
-		return retval.setData( [res.rows[0].passhash, res.rows[0].activesession] );
+		return retval.setData( [res.rows[0].passhash, res.rows[0].activesessionid] );
 	}
 }
