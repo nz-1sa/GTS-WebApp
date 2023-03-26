@@ -110,7 +110,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 		console.log('wrong email ident');
 		return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, incorrect email ident`,'', []);
 	}
-	let knownSaltPassHash: string = la.data?[0];
+	let knownSaltPassHash: string = la.data![0];
 	
 	console.log('using hash from db');
 	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
