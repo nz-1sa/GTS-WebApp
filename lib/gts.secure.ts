@@ -105,7 +105,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	//TODO: get knownSaltPassHash for ident from database
 	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
 	
-	//console.log('using debug key to decode');
+	console.log('using debug key to decode');
 	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
 	
 	// decrypt challenge using knownSaltPassHash and captcha
