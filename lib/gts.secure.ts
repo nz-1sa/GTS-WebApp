@@ -106,12 +106,12 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	let knownSaltPassHash:string = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
 	
 	//console.log('using debug key to decode');
-	//console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
+	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
 	
 	// decrypt challenge using knownSaltPassHash and captcha
 	let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
 	
-	//console.log({decoded:decoded});
+	console.log({decoded:decoded});
 	
 	if(!new RegExp("^[0-9]+$", "g").test(decoded)){
 		console.log('failed regex check');
