@@ -106,12 +106,17 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	// let knownSaltPassHash:string = 'm2XJDcHlBnPexYCXBA7Ulko6o34=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
 	let la:GTS.DM.WrappedResult<[string,number]> = await LoginAccount.getPassHash(uuid, ident);
 	// la.error
+	if(la.error){
+		console.log('wrong email ident');
+		return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, incorrect email ident`,'', []);
+	}
+	let knownSaltPassHash: string = la.data?[0];
 	
 	console.log('using hash from db');
-	console.log({knownSaltPassHash:la.data[0], captcha:sess.captcha, challenge:challenge});
+	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
 	
 	// decrypt challenge using knownSaltPassHash and captcha
-	let decoded:string = Encodec.decrypt(challenge, la.data[0], sess.captcha);
+	let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
 	
 	console.log({decoded:decoded});
 	
