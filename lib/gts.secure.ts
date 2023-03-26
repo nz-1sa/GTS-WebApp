@@ -104,13 +104,14 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	
 	//TODO: get knownSaltPassHash for ident from database
 	// let knownSaltPassHash:string = 'm2XJDcHlBnPexYCXBA7Ulko6o34=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
-	let la:[string,number] = LoginAccount.getPassHash(uuid, ident);
+	let la:GTS.DM.WrappedResult<[string,number]> = await LoginAccount.getPassHash(uuid, ident);
+	// la.error
 	
 	console.log('using hash from db');
-	console.log({knownSaltPassHash:la[0], captcha:sess.captcha, challenge:challenge});
+	console.log({knownSaltPassHash:la.data[0], captcha:sess.captcha, challenge:challenge});
 	
 	// decrypt challenge using knownSaltPassHash and captcha
-	let decoded:string = Encodec.decrypt(challenge, la[0], sess.captcha);
+	let decoded:string = Encodec.decrypt(challenge, la.data[0], sess.captcha);
 	
 	console.log({decoded:decoded});
 	
@@ -806,7 +807,7 @@ export class LoginAccount{
 	}
 	
 	static async getPassHash(uuid:string, ident:string): Promise<GTS.DM.WrappedResult<[string,number]>>{
-		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+		let retval: GTS.DM.WrappedResult<string,number> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.getPassHash', uuid );
 		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
