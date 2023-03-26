@@ -103,13 +103,14 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	}
 	
 	//TODO: get knownSaltPassHash for ident from database
-	let knownSaltPassHash:string = 'm2XJDcHlBnPexYCXBA7Ulko6o34=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
+	// let knownSaltPassHash:string = 'm2XJDcHlBnPexYCXBA7Ulko6o34=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
+	let la:[string,number] = LoginAccount.getPassHash(uuid, ident);
 	
-	console.log('using debug key to decode');
-	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
+	console.log('using hash from db');
+	console.log({knownSaltPassHash:la[0], captcha:sess.captcha, challenge:challenge});
 	
 	// decrypt challenge using knownSaltPassHash and captcha
-	let decoded:string = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
+	let decoded:string = Encodec.decrypt(challenge, la[0], sess.captcha);
 	
 	console.log({decoded:decoded});
 	
@@ -677,5 +678,141 @@ export class Session{
 		}
 		await Promise.all(promises);
 		return passwordChars.join('');
+	}
+}
+
+export class LoginAccount{
+	id: number;
+	ident: string;
+	email: string;
+	passHash: string;
+	activeSession: number;
+	chkSum: string;
+	constructor(pId?:number, pIdent?:string, pEmail?:string, pPassHash?:string, pActiveSession?:number, pChkSum?:string){
+		this.id = pId ?? 0;
+		this.ident = pIdent ?? '';
+		this.email = pEmail ?? '';
+		this.passHash = pPassHash ?? '';
+		this.activeSession = pActiveSession ?? 0;
+		this.chkSum = pChkSum ?? '';
+	}
+	
+	// base64 sha1 hash of the loginAccount's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
+	genHash(): string{
+		var j = JSON.stringify({ident:this.ident,email:this.email,passHash:this.passHash,activeSession:this.activeSession});
+		var hsh = crypto.createHash('sha1').update(j).digest('base64');
+		return hsh;
+	}
+	
+	// cast loginAccount as a JSON string
+	toString(): string{
+		return JSON.stringify(this.toJSON());
+	}
+	
+	// cast loginAccount as a JSON object
+	toJSON(): object{
+		return {id:this.id.toString(),ident:this.ident,email:this.email,passHash:this.passHash,activeSession:this.activeSession.toString(),chkSum:this.chkSum};
+	}
+	
+	// casted value checks for allowed values in a loginAccount
+	verifyValuesAreValid(): [boolean, string]{
+		let errDesc:string = '';
+		var idIsValid = (this.id >= 0 && this.id <= 2147483600); if( !idIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for id.'; }
+		var identIsValid = (this.ident.length >= 3 && this.ident.length <= 48); if( !identIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for ident.'; }
+		var emailIsValid = (this.email.length >= 6 && this.email.length <= 100); if( !emailIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for email.'; }
+		var passHashIsValid = (this.passHash.length >= 28 && this.passHash.length <= 28); if( !passHashIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for passHash.'; }
+		var activeSessionIsValid = (this.activeSession >= 0 && this.activeSession <= 2147483600); if( !activeSessionIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for activeSession.'; }
+		var chkSumIsValid = (true); if( !chkSumIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for chkSum.'; }
+		return [idIsValid && identIsValid && emailIsValid && passHashIsValid && activeSessionIsValid && chkSumIsValid, errDesc];
+	}
+	
+	// instantiate a loginAccount from string values. Null returned if sting values fail regex checks or casted value checks
+	static fromStrings( id: string, ident: string, email: string, passHash: string, activeSession: string, chkSum: string ): LoginAccount|null{
+		let regexTests: boolean[] = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(ident), new RegExp("^[a-zA-Z0-9\._-]+@[a-zA-Z0-9\.-]+\.[a-zA-Z]{2,6}$", "g").test(email), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(passHash), new RegExp("^[0-9]+$", "g").test(activeSession), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+		if(!regexTests.every(Boolean)){
+			// detail invalid value
+			let paramNames: string[] = ["id", "ident", "email", "passHash", "activeSession", "chkSum"];
+			for(var i=0; i<regexTests.length; i++){
+				if(!regexTests[i]){
+					console.log('posted value for '+paramNames[i]+' fails regex check');
+				}
+			}
+			return null;
+		}
+		let loginAccount:LoginAccount = new LoginAccount(parseInt(id), (ident), (email), (passHash), parseInt(activeSession), (chkSum));
+		let valueCheck = loginAccount.verifyValuesAreValid();
+		let success = valueCheck[0];
+		if(success){
+			return loginAccount;
+		}
+		let errMsg = valueCheck[1]; console.log(errMsg);
+		return null;
+	}
+	
+	// list all the loginAccounts from the database in full detail
+	static async fetchAllFromDB(uuid:string): Promise<GTS.DM.WrappedResult<LoginAccount[]>> {
+		let retval: GTS.DM.WrappedResult<LoginAccount[]> = new GTS.DM.WrappedResult();
+		let retvalData: LoginAccount[] = [];
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.fetchAllFromDB', uuid );
+		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		const res = await client.query( 'SELECT id, ident, email, passHash, activeSession, chkSum FROM loginAccounts;' );
+		if( res.rowCount == 0 ) { return retval.setData( retvalData ); }        // handle empty table
+		for( let i = 0; i < res.rowCount; i++ ) {
+			retvalData.push( new LoginAccount( res.rows[i].id, res.rows[i].ident, res.rows[i].email, res.rows[i].passhash, res.rows[i].activesession, res.rows[i].chksum) );
+		}
+		return retval.setData( retvalData );
+	}
+	
+	// add a loginAccount to the database, id is assigned as it is added
+	async addToDB(uuid:string): Promise<GTS.DM.WrappedResult<null>> {
+		let retval: GTS.DM.WrappedResult<null> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.addToDB', uuid );
+		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		this.chkSum = this.genHash();
+		const res = await client.query( 'CALL addLoginAccount($1,$2,$3,$4,$5,$6);',[this.ident,this.email,this.passHash,this.activeSession,this.chkSum,0]);
+		if( res.rowCount == 0 ) { return retval.setError( 'LoginAccount not added.' ); }
+		this.id = res.rows[0].insertedid;
+		return retval.setData( null );
+	}
+	
+	// update a loginAccount in the database
+	async updateDB(uuid:string): Promise<GTS.DM.WrappedResult<null>> {
+		let retval: GTS.DM.WrappedResult<null> = new GTS.DM.WrappedResult();
+		let fetchConn: GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.updateDB', uuid );
+		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		let newChksum:string = this.genHash();
+		const res = await client.query('CALL updateLoginAccount($1,$2,$3,$4,$5,$6,$7,$8);',[this.id,this.ident,this.email,this.passHash,this.activeSession,newChksum,this.chkSum,0]);
+		if( res.rowCount == 0 ) { return retval.setError( 'LoginAccount not updated. 0 row count.' ); }
+		if(res.rows[0].updatestatus == 0){ return retval.setError( 'LoginAccount not updated. ChkSum failed.' ); }
+		this.chkSum = newChksum;
+		return retval.setData(null);
+	}
+	
+	// delete a loginAccount from the database
+	async deleteFromDB(uuid:string): Promise<GTS.DM.WrappedResult<void>> {
+		let retval: GTS.DM.WrappedResult<void> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> =  await DBCore.getConnection('LoginAccount.deleteFromDB', uuid);
+		if(fetchConn.error){ return retval.setError('DB Connection error\n'+fetchConn.message); }
+		if(fetchConn.data == null){ return retval.setError('DB Connection NULL error'); }
+		let client:DBCore.Client = fetchConn.data;
+		await client.query('DELETE FROM loginAccounts WHERE id=$1;',[this.id]);
+		return retval.setData();
+	}
+	
+	static async getPassHash(uuid:string, ident:string): Promise<GTS.DM.WrappedResult<[string,number]>>{
+		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.getPassHash', uuid );
+		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		const res = await client.query( 'SELECT passhash, activesession FROM loginAccounts WHERE ident = $1;',[ident] );
+		if( res.rowCount == 0 ) { return retval.setError( 'Account not found.' ); }
+		return retval.setData( [res.rows[0].passhash, res.rows[0].activesession] );
 	}
 }
