@@ -812,7 +812,7 @@ export class LoginAccount{
 	}
 	
 	static async getPassHash(uuid:string, ident:string): Promise<GTS.DM.WrappedResult<[string,number]>>{
-		let retval: GTS.DM.WrappedResult<string,number> = new GTS.DM.WrappedResult();
+		let retval: GTS.DM.WrappedResult<[string,number]> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.getPassHash', uuid );
 		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
