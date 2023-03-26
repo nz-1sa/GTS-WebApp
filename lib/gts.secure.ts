@@ -102,13 +102,30 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 		return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`,'', []);
 	}
 	
-	//TODO: get knownSaltPassHash for ident from database
-	// let knownSaltPassHash:string = 'm2XJDcHlBnPexYCXBA7Ulko6o34=';	//knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
-	let la:GTS.DM.WrappedResult<[string,number]> = await LoginAccount.getPassHash(uuid, ident);
+	// get login account from db
+	let la:GTS.DM.WrappedResult<[string,string]> = await LoginAccount.getPassHash(uuid, ident);
 	// la.error
 	if(la.error){
 		console.log('wrong email ident');
 		return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, incorrect email ident`,'', []);
+	}
+	let accountSessionId:string = la.data![1];
+	if(accountSessionId.length > 0){
+		if(accountSessionId == sess.sessionId){
+			// error, how can account be assigned to us when we are not logged in yet (trying to do so)
+		} else {
+			console.log('login already attached to a different session');
+			GTS.DM.WrappedResult<Session> rs = await getSessionFromDB(uuid, accountSessionId);
+			if(rs.error){
+				console.log('error getting attached session');
+				console.log(rs.message);
+			} else {
+				console.log('attached session is ');
+				console.log(rs.data!);
+			}
+			//TODO: get if the attached session is expired, etc...
+			return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, is already active`,'', []);
+		}
 	}
 	let knownSaltPassHash: string = la.data![0];
 	
@@ -692,20 +709,20 @@ export class LoginAccount{
 	ident: string;
 	email: string;
 	passHash: string;
-	activeSession: number;
+	activeSessionId: string;
 	chkSum: string;
-	constructor(pId?:number, pIdent?:string, pEmail?:string, pPassHash?:string, pActiveSession?:number, pChkSum?:string){
+	constructor(pId?:number, pIdent?:string, pEmail?:string, pPassHash?:string, pActiveSessionId?:string, pChkSum?:string){
 		this.id = pId ?? 0;
 		this.ident = pIdent ?? '';
 		this.email = pEmail ?? '';
 		this.passHash = pPassHash ?? '';
-		this.activeSession = pActiveSession ?? 0;
+		this.activeSessionId = pActiveSessionId ?? '';
 		this.chkSum = pChkSum ?? '';
 	}
 	
 	// base64 sha1 hash of the loginAccount's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
 	genHash(): string{
-		var j = JSON.stringify({ident:this.ident,email:this.email,passHash:this.passHash,activeSession:this.activeSession});
+		var j = JSON.stringify({ident:this.ident,email:this.email,passHash:this.passHash,activeSessionId:this.activeSessionId});
 		var hsh = crypto.createHash('sha1').update(j).digest('base64');
 		return hsh;
 	}
@@ -717,7 +734,7 @@ export class LoginAccount{
 	
 	// cast loginAccount as a JSON object
 	toJSON(): object{
-		return {id:this.id.toString(),ident:this.ident,email:this.email,passHash:this.passHash,activeSession:this.activeSession.toString(),chkSum:this.chkSum};
+		return {id:this.id.toString(),ident:this.ident,email:this.email,passHash:this.passHash,activeSessionId:this.activeSessionId,chkSum:this.chkSum};
 	}
 	
 	// casted value checks for allowed values in a loginAccount
@@ -727,17 +744,17 @@ export class LoginAccount{
 		var identIsValid = (this.ident.length >= 3 && this.ident.length <= 48); if( !identIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for ident.'; }
 		var emailIsValid = (this.email.length >= 6 && this.email.length <= 100); if( !emailIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for email.'; }
 		var passHashIsValid = (this.passHash.length >= 28 && this.passHash.length <= 28); if( !passHashIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for passHash.'; }
-		var activeSessionIsValid = (this.activeSession >= 0 && this.activeSession <= 2147483600); if( !activeSessionIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for activeSession.'; }
+		var activeSessionIdIsValid = (this.activeSessionId.length >= 36 && this.activeSessionId.length <= 36); if( !activeSessionIdIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for activeSessionId.'; }
 		var chkSumIsValid = (true); if( !chkSumIsValid ){ if(errDesc.length > 0){errDesc=errDesc+' ';} errDesc = errDesc + 'Invalid value for chkSum.'; }
-		return [idIsValid && identIsValid && emailIsValid && passHashIsValid && activeSessionIsValid && chkSumIsValid, errDesc];
+		return [idIsValid && identIsValid && emailIsValid && passHashIsValid && activeSessionIdIsValid && chkSumIsValid, errDesc];
 	}
 	
 	// instantiate a loginAccount from string values. Null returned if sting values fail regex checks or casted value checks
-	static fromStrings( id: string, ident: string, email: string, passHash: string, activeSession: string, chkSum: string ): LoginAccount|null{
-		let regexTests: boolean[] = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(ident), new RegExp("^[a-zA-Z0-9\._-]+@[a-zA-Z0-9\.-]+\.[a-zA-Z]{2,6}$", "g").test(email), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(passHash), new RegExp("^[0-9]+$", "g").test(activeSession), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+	static fromStrings( id: string, ident: string, email: string, passHash: string, activeSessionId: string, chkSum: string ): LoginAccount|null{
+		let regexTests: boolean[] = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(ident), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(email), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(passHash), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(activeSessionId), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
 		if(!regexTests.every(Boolean)){
 			// detail invalid value
-			let paramNames: string[] = ["id", "ident", "email", "passHash", "activeSession", "chkSum"];
+			let paramNames: string[] = ["id", "ident", "email", "passHash", "activeSessionId", "chkSum"];
 			for(var i=0; i<regexTests.length; i++){
 				if(!regexTests[i]){
 					console.log('posted value for '+paramNames[i]+' fails regex check');
@@ -745,7 +762,7 @@ export class LoginAccount{
 			}
 			return null;
 		}
-		let loginAccount:LoginAccount = new LoginAccount(parseInt(id), (ident), (email), (passHash), parseInt(activeSession), (chkSum));
+		let loginAccount:LoginAccount = new LoginAccount(parseInt(id), (ident), (email), (passHash), (activeSessionId), (chkSum));
 		let valueCheck = loginAccount.verifyValuesAreValid();
 		let success = valueCheck[0];
 		if(success){
@@ -763,10 +780,10 @@ export class LoginAccount{
 		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
-		const res = await client.query( 'SELECT id, ident, email, passHash, activeSession, chkSum FROM loginAccounts;' );
+		const res = await client.query( 'SELECT id, ident, email, passHash, activeSessionId, chkSum FROM loginAccounts;' );
 		if( res.rowCount == 0 ) { return retval.setData( retvalData ); }        // handle empty table
 		for( let i = 0; i < res.rowCount; i++ ) {
-			retvalData.push( new LoginAccount( res.rows[i].id, res.rows[i].ident, res.rows[i].email, res.rows[i].passhash, res.rows[i].activesession, res.rows[i].chksum) );
+			retvalData.push( new LoginAccount( res.rows[i].id, res.rows[i].ident, res.rows[i].email, res.rows[i].passhash, res.rows[i].activesessionid, res.rows[i].chksum) );
 		}
 		return retval.setData( retvalData );
 	}
@@ -779,7 +796,7 @@ export class LoginAccount{
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
 		this.chkSum = this.genHash();
-		const res = await client.query( 'CALL addLoginAccount($1,$2,$3,$4,$5,$6);',[this.ident,this.email,this.passHash,this.activeSession,this.chkSum,0]);
+		const res = await client.query( 'CALL addLoginAccount($1,$2,$3,$4,$5,$6);',[this.ident,this.email,this.passHash,this.activeSessionId,this.chkSum,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'LoginAccount not added.' ); }
 		this.id = res.rows[0].insertedid;
 		return retval.setData( null );
@@ -793,7 +810,7 @@ export class LoginAccount{
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
 		let newChksum:string = this.genHash();
-		const res = await client.query('CALL updateLoginAccount($1,$2,$3,$4,$5,$6,$7,$8);',[this.id,this.ident,this.email,this.passHash,this.activeSession,newChksum,this.chkSum,0]);
+		const res = await client.query('CALL updateLoginAccount($1,$2,$3,$4,$5,$6,$7,$8);',[this.id,this.ident,this.email,this.passHash,this.activeSessionId,newChksum,this.chkSum,0]);
 		if( res.rowCount == 0 ) { return retval.setError( 'LoginAccount not updated. 0 row count.' ); }
 		if(res.rows[0].updatestatus == 0){ return retval.setError( 'LoginAccount not updated. ChkSum failed.' ); }
 		this.chkSum = newChksum;
@@ -811,8 +828,8 @@ export class LoginAccount{
 		return retval.setData();
 	}
 	
-	static async getPassHash(uuid:string, ident:string): Promise<GTS.DM.WrappedResult<[string,number]>>{
-		let retval: GTS.DM.WrappedResult<[string,number]> = new GTS.DM.WrappedResult();
+	static async getPassHash(uuid:string, ident:string): Promise<GTS.DM.WrappedResult<[string,string]>>{
+		let retval: GTS.DM.WrappedResult<[string,string]> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'LoginAccount.getPassHash', uuid );
 		if( fetchConn.error ){ return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ return retval.setError( 'DB Connection NULL error' ); }
