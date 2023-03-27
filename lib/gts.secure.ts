@@ -45,7 +45,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
 					let ejsFile:string = web.getFile(url+'.ejs');
 					if(fs.existsSync(ejsFile)) {
-						ejs.renderFile(ejsFile, {}, {}, function(err, result){	// renderFile( filename, data, options
+						ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 							if( err ){
 								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 							} else {
