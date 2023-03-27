@@ -7,8 +7,8 @@ import *  as WebApp from './gts.webapp';
 import {Concurrency} from './gts.concurrency';
 var crypto = require('crypto');
 import * as Encodec from './gts.encodec';
-import ejs from 'ejs';
 
+const ejs = require('ejs');
 const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
