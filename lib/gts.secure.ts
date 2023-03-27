@@ -57,7 +57,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 						res.sendFile( web.getFile(url) );
 						success = true;
 					} else {
-						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve ejs file',`UUID:${uuid} Requested ejs file doesn't exist`,err);
+						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve ejs file',`UUID:${uuid} Requested ejs file doesn't exist`,url);
 					}
 				}
 			}
