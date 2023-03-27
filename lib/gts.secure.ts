@@ -7,6 +7,7 @@ import *  as WebApp from './gts.webapp';
 import {Concurrency} from './gts.concurrency';
 var crypto = require('crypto');
 import * as Encodec from './gts.encodec';
+import ejs from 'ejs';
 
 const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
@@ -42,8 +43,22 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 					}
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
-					res.sendFile( web.getFile( url ) );
-					success = true;
+					let ejsFile:string = web.getFile(url+'.ejs');
+					if(fs.existsSync(ejsFile)) {
+						ejs.renderFile(ejsFile, {}, {}, function(err, result){	// renderFile( filename, data, options
+							if( err ){
+								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
+							} else {
+								res.send(result);
+								success = true;
+							}
+						});
+					} else if(fs.existsSync(web.getFile(url))){
+						res.sendFile( web.getFile(url) );
+						success = true;
+					} else {
+						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve ejs file',`UUID:${uuid} Requested ejs file doesn't exist`,err);
+					}
 				}
 			}
 			if(!success){ res.send(resp.toString()); }
