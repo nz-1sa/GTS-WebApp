@@ -111,25 +111,37 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	}
 	console.log(la);
 	let accountSessionId:string = la.data![1];
+	
 	if(accountSessionId.length > 0){
+		let doReject:boolean = false;
 		if(accountSessionId == sess.sessionId){
-			// error, how can account be assigned to us when we are not logged in yet (trying to do so)
+			console.log('error, how can account be assigned to us when we are not logged in yet (trying to do so)');
+			doReject = true;
 		} else {
 			console.log('login already attached to a different session');
+			await Session.expireOldSessionsInDB(uuid);
 			let rs:GTS.DM.WrappedResult<Session> = await Session.getSessionFromDB(uuid, accountSessionId);
 			if(rs.error){
 				console.log('error getting attached session');
 				console.log(rs.message);
+				doReject = true;
 			} else {
-				console.log('attached session is ');
-				console.log(rs.data!);
+				let s:Session = rs.data!;
+				if(s.status == SessionStatus.LoggedOuts.status == SessionStatus.Expired){
+					console.log('clearing logged out or expired session');
+					LoginAccount.setActiveSessionId(uuid,ident,'');	// clear active session if is for a logged out or expired session
+				} else {
+					console.log('attached session is ');
+					console.log(s);
+					doReject = true;
+				}
 			}
-			//TODO: get if the attached session is expired, etc...
+		}
+		if(doReject){
 			return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, is already active`,'', []);
 		}
 	}
 	let knownSaltPassHash: string = la.data![0];
-	
 	console.log('using hash from db');
 	console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
 	
@@ -166,7 +178,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 	sess.updateDB(uuid);
 	//console.log({sess:sess});
 	
-	// show that the login is in use
+	// show that the login is in use (prevent dual login)
 	LoginAccount.setActiveSessionId(uuid,ident,sess.sessionId);
 	
 	// encrypt and return to client the password to use for the session, and the nonce base to start sequence from
@@ -461,6 +473,20 @@ export class Session{
 		return retval.setData( res.rowCount == 0 );
 	}
 	
+	// expire old sessions
+	static async expireOldSessionsInDB(uuid:string): Promise<GTS.DM.WrappedResult<boolean>>{
+		//console.log('in expireOldSessioexpireOldSessionsInDBnsFromDB');
+		let retval: GTS.DM.WrappedResult<Session> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'Session.expireOldSessionsInDB', uuid );
+		if( fetchConn.error ) { console.log('db error '+fetchConn.message); return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ console.log('db error, null connection returned'); return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		//console.log('got db client');
+		const res = await client.query( 'UPDATE session SET status = 4 WHERE EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
+		//console.log('awaited db query');
+		return retval.setData( res.rowCount == 0 );
+	}
+	
 	// get a session from the database for the specified sessionId
 	static async getSessionFromDB(uuid:string, sessionId:string): Promise<GTS.DM.WrappedResult<Session>>{
 		//console.log('in getSessionFromDB');
@@ -668,6 +694,7 @@ export class Session{
 		if(!cookies['session']){ console.log('no session cookie at hasSession check'); return [false,undefined]; }
 		if(cookies['session'].length != 36){ console.log('incorrect session length at hasSession check'); return [false,undefined]; }
 		
+		await Session.expireOldSessionsInDB(uuid);
 		let ws:GTS.DM.WrappedResult<Session> = await Session.getSessionFromDB(uuid, cookies['session']);
 		if( ws.error ) { console.log('failed to get session from db '+ws.message ); return [false,undefined];}
 		if( ws.data == null ) { console.log('null session from db'); return [false,undefined]; }
