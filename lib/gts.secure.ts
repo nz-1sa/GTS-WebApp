@@ -716,7 +716,7 @@ export class Session{
 		let s: Session = ws.data;
 		if(s.ip != requestIp){ console.log('ip mismatch at hasSession check'); return [false,undefined]; }
 		if(s.status == SessionStatus.Expired){ console.log('expired session at hasSession check'); return [false,undefined]; }
-		await Session.updateSessionLastSeenInDB(uuid, cookies['session');
+		await Session.updateSessionLastSeenInDB(uuid, cookies['session']);
 		return [true,s];
 	}
 
