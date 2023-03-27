@@ -475,7 +475,7 @@ export class Session{
 	
 	// expire old sessions
 	static async expireOldSessionsInDB(uuid:string): Promise<GTS.DM.WrappedResult<boolean>>{
-		//console.log('in expireOldSessioexpireOldSessionsInDBnsFromDB');
+		//console.log('in expireOldSessionsInDB');
 		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'Session.expireOldSessionsInDB', uuid );
 		if( fetchConn.error ) { console.log('db error '+fetchConn.message); return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
@@ -483,6 +483,20 @@ export class Session{
 		let client:DBCore.Client = fetchConn.data;
 		//console.log('got db client');
 		const res = await client.query( 'UPDATE sessions SET status = 4 WHERE EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
+		//console.log('awaited db query');
+		return retval.setData( res.rowCount == 0 );
+	}
+	
+	// update session seen
+	static async updateSessionLastSeenInDB(uuid:string, sessionId:string): Promise<GTS.DM.WrappedResult<boolean>>{
+		//console.log('in updateSessionLastSeenInDB');
+		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
+		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'Session.updateSessionLastSeenInDB', uuid );
+		if( fetchConn.error ) { console.log('db error '+fetchConn.message); return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
+		if( fetchConn.data == null ){ console.log('db error, null connection returned'); return retval.setError( 'DB Connection NULL error' ); }
+		let client:DBCore.Client = fetchConn.data;
+		//console.log('got db client');
+		const res = await client.query( 'UPDATE sessions SET lastseen = now() WHERE sessionId = $1;',[sessionId] );
 		//console.log('awaited db query');
 		return retval.setData( res.rowCount == 0 );
 	}
@@ -702,6 +716,7 @@ export class Session{
 		let s: Session = ws.data;
 		if(s.ip != requestIp){ console.log('ip mismatch at hasSession check'); return [false,undefined]; }
 		if(s.status == SessionStatus.Expired){ console.log('expired session at hasSession check'); return [false,undefined]; }
+		await Session.updateSessionLastSeenInDB(uuid, cookies['session');
 		return [true,s];
 	}
 
