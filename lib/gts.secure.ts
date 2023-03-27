@@ -127,7 +127,7 @@ async function handleLoginRequest(uuid:string, requestIp:string, cookies:GTS.DM.
 				doReject = true;
 			} else {
 				let s:Session = rs.data!;
-				if(s.status == SessionStatus.LoggedOuts.status == SessionStatus.Expired){
+				if(s.status == SessionStatus.LoggedOut || s.status == SessionStatus.Expired){
 					console.log('clearing logged out or expired session');
 					LoginAccount.setActiveSessionId(uuid,ident,'');	// clear active session if is for a logged out or expired session
 				} else {
@@ -476,7 +476,7 @@ export class Session{
 	// expire old sessions
 	static async expireOldSessionsInDB(uuid:string): Promise<GTS.DM.WrappedResult<boolean>>{
 		//console.log('in expireOldSessioexpireOldSessionsInDBnsFromDB');
-		let retval: GTS.DM.WrappedResult<Session> = new GTS.DM.WrappedResult();
+		let retval: GTS.DM.WrappedResult<boolean> = new GTS.DM.WrappedResult();
 		let fetchConn:GTS.DM.WrappedResult<DBCore.Client> = await DBCore.getConnection( 'Session.expireOldSessionsInDB', uuid );
 		if( fetchConn.error ) { console.log('db error '+fetchConn.message); return retval.setError( 'DB Connection error\n' + fetchConn.message ); }
 		if( fetchConn.data == null ){ console.log('db error, null connection returned'); return retval.setError( 'DB Connection NULL error' ); }
