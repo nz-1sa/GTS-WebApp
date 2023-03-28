@@ -355,7 +355,7 @@ export class WebServerHelper{
 		});
 	}
 	
-	async function handleServeFile(web:WebServerHelper, res, url:string):WS.WebResponse {
+	private async handleServeFile(web:WebServerHelper, res, url:string):WS.WebResponse {
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
 			return new WS.WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
