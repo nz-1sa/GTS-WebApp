@@ -22,7 +22,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `);
 		}
 		return new WS.WebResponse(true, '',`UUID:${uuid} Testing code for admin files`,`url is ${url}`);
-	}
+	});
 	
 	// a captcha is shown as part of starting a session
 	web.registerHandlerGet(webapp, '/api/startSession', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
