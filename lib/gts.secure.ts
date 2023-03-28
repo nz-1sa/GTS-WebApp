@@ -46,6 +46,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					success = true;
 				}
 			}
+			if(!success){ res.send(resp.toString());
 		} finally {
 			// log the request that was served
 			let timeEnd:number = new Date().getTime();
