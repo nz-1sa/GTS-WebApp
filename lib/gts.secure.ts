@@ -21,9 +21,9 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get('/admin/*', async (req, res) => {
 		let timeStart:number = new Date().getTime();
 		let success:boolean = false;
-		let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','')
+		let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','');
+		let uuid:string = await web.getUUID();
 		try{
-			let uuid:string = await web.getUUID();
 			// return an error if we could not get an uuid
 			if(uuid.startsWith('ERROR:')){
 				console.error(uuid);
@@ -38,7 +38,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					let url = req.originalUrl;
 					if(!url.startsWith('/admin/')){
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
-					}else if(!url.indexOf('/../')>=0){
+					}else if(url.indexOf('/../')>=0){
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 					}
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
@@ -49,7 +49,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 		} finally {
 			// log the request that was served
 			let timeEnd:number = new Date().getTime();
-			let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+			let storeLog:GTS.DM.WrappedResult<void> = await WS.DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
 			if(storeLog.error){
 				console.error('unable to store log of admin request');
 				console.error(storeLog.message);
