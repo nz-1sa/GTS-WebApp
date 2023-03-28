@@ -3,6 +3,7 @@ import * as DBCore from "./gts.db";
 import * as UUID from "./gts.uuid";
 import { Concurrency } from "./gts.concurrency";
 import * as Express from 'express';
+import * as Secure from "./gts.secure";
 
 const PATH = require('path');
 const ejs = require('ejs');
@@ -287,7 +288,7 @@ export class WebServerHelper{
 				} else {
 					let requestIp:string = req.ip;
 					let cookies:GTS.DM.HashTable<string> = req.cookies;
-					let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
+					let isLoggedIn:boolean = await Secure.Session.isLoggedIn(uuid, requestIp, cookies);
 					if(!isLoggedIn){
 						resp = new WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login`,'');
 					} else {
@@ -331,7 +332,7 @@ export class WebServerHelper{
 				} else {
 					let requestIp:string = req.ip;
 					let cookies:GTS.DM.HashTable<string> = req.cookies;
-					let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
+					let isLoggedIn:boolean = await Secure.Session.isLoggedIn(uuid, requestIp, cookies);
 					let url = req.originalUrl.replace('\\','/');
 					if(url=='/admin' || url.startsWith('/admin/')){
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access admin from rootFiles handler`,'');
