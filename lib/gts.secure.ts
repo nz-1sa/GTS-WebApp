@@ -54,7 +54,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 							}
 						});
 					} else if(url.endsWith('.ejs')){
-						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Will not serve un-rendered ejs files`,err);
+						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
 					} else if(fs.existsSync(web.getFile(url))){
 						res.sendFile( web.getFile(url) );
 						success = true;
