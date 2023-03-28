@@ -45,9 +45,9 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
 					let ejsFile:string = web.getFile(url+'.ejs');
 					let ejsRootFile:string = web.getFile(url+'/.ejs');
-					if(fs.existsSync(ejsFile)) {
-						console.log('render ejs');
-						ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
+					if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
+						console.log('render root ejs');
+						ejs.renderFile(ejsRootFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 							if( err ){
 								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 							} else {
@@ -55,9 +55,9 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 								success = true;
 							}
 						});
-					} else if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-						console.log('render root ejs');
-						ejs.renderFile(ejsRootFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
+					} else if(fs.existsSync(ejsFile)) {
+						console.log('render ejs');
+						ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 							if( err ){
 								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 							} else {
