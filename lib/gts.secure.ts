@@ -45,6 +45,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
 					let ejsFile:string = web.getFile(url+'.ejs');
 					let ejsRootFile:string = web.getFile(url+'/.ejs');
+					console.log(ejsRootFile);
 					if(fs.existsSync(ejsFile)) {
 						console.log('render ejs');
 						ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
