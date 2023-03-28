@@ -18,7 +18,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
 	web.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
-		let isLoggedIn:boolean = Session.isLoggedIn(uuid, requestIp, cookies);
+		let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
 		console.log('in request for admin file');
 		console.log(isLoggedIn);
 		if(!isLoggedIn){
