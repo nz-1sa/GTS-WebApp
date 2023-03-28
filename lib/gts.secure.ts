@@ -17,7 +17,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	// serve login page from project root
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
-	webapp.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+	web.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
 		if(!Session.isLoggedIn(uuid, requestIp, cookies)){
 			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `);
 		}
