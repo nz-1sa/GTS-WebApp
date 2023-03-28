@@ -55,7 +55,7 @@ export class WebServerHelper{
 		this.adminHandlers[action] = work;
 	}
 	
-	private async getUUID(): Promise<string>{
+	public async getUUID(): Promise<string>{
 		const loopSafety:number = 20;
 		let loopIteration:number = 1;
 		let uuid:string = await UUID.newUUID();
@@ -71,7 +71,7 @@ export class WebServerHelper{
 		return uuid;
 	}
 	
-	private releaseUUID(uuid:string):void{
+	public releaseUUID(uuid:string):void{
 		// release the uuid from the register of those in use
 			delete this.uuidRegister[uuid];
 	}

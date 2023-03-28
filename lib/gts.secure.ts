@@ -17,14 +17,48 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	// serve login page from project root
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
-	web.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
-		let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
-		console.log('in request for admin file');
-		console.log(isLoggedIn);
-		if(!isLoggedIn){
-			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `,'');
+	// serve files from the admin directory if are logged in
+	webapp.get('/admin/*', (req, res){
+		let timeStart:number = new Date().getTime();
+		let success:boolean = false;
+		let resp:WS.WebResponse = new WebResponse(false, 'Just Init', '','')
+		try{
+			let uuid:string = web.getUUID();
+			// return an error if we could not get an uuid
+			if(uuid.startsWith('ERROR:')){
+				console.error(uuid);
+				resp = new WebResponse(false, 'Could not generate unique uuid', '','');
+			} else {
+				let requestIp:string = req.ip;
+				let cookies:GTS.DM.HashTable<string> = req.cookies;
+				let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
+				if(!isLoggedIn){
+					resp = new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login`,'');
+				} else {
+					let url = req.originalUrl;
+					if(!url.startsWith('/admin/')){
+						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
+					}else if(!url.indexOf('/../')>=0){
+						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
+					}
+					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
+					res.sendFile( web.getFile( url ) ) );
+					success = true;
+				}
+			}
+		} finally {
+			// log the request that was served
+			let timeEnd:number = new Date().getTime();
+			let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+			if(storeLog.error){
+				console.error('unable to store log of admin request');
+				console.error(storeLog.message);
+			}
+			// free db resources for the request
+			await DBCore.releaseConnection(uuid);
+			// release the uuid from the register of those in use
+			this.releaseUUID(uuid);
 		}
-		return new WS.WebResponse(true, '',`UUID:${uuid} Testing code for admin files`,`url is ${url}`);
 	});
 	
 	// a captcha is shown as part of starting a session
