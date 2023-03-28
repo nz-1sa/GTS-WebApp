@@ -37,7 +37,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					resp = new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login`,'');
 				} else {
 					let url = req.originalUrl;
-					if(!url.startsWith('/admin/')){
+					if(!(url=='/admin' || url.startsWith('/admin/'))){
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 					}else if(url.indexOf('/../')>=0){
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
