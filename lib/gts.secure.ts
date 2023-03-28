@@ -18,7 +18,10 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
 	web.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
-		if(!Session.isLoggedIn(uuid, requestIp, cookies)){
+		let isLoggedIn:boolean = Session.isLoggedIn(uuid, requestIp, cookies);
+		console.log('in request for admin file');
+		console.log(isLoggedIn);
+		if(!isLoggedIn){
 			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `,'');
 		}
 		return new WS.WebResponse(true, '',`UUID:${uuid} Testing code for admin files`,`url is ${url}`);
