@@ -295,7 +295,7 @@ export class WebServerHelper{
 						if(!(url=='/admin' || url.startsWith('/admin/'))){
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
-							resp = this.handleServeFile(web, res, url, uuid);
+							resp = await this.handleServeFile(web, res, url, uuid);
 						}
 					}
 				}
@@ -319,7 +319,7 @@ export class WebServerHelper{
 	// attach code to serve normal website files
 	public attachRootFiles(web:WebServerHelper, webapp:Express.Application):void{
 		// serve files from the public directory
-		webapp.get('/*', async (req, res) => {
+		webapp.get('/*', async (req:Express.Request, res:Express.Response) => {
 			let timeStart:number = new Date().getTime();
 			let resp:WebResponse = new WebResponse(false, 'Just Init', '','');
 			let uuid:string = await web.getUUID();
@@ -338,7 +338,7 @@ export class WebServerHelper{
 					}else if(url=='/api' || url.startsWith('/api/')){
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
-						resp = this.handleServeFile(web, res, url, uuid);
+						resp = await this.handleServeFile(web, res, url, uuid);
 					}
 				}
 				if(!resp.success){ res.send(resp.toString()); }
@@ -358,7 +358,7 @@ export class WebServerHelper{
 		});
 	}
 	
-	private async handleServeFile(web:WebServerHelper, res, url:string, uuid:string):Promise<WebResponse> {
+	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string):Promise<WebResponse> {
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
 			return new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
