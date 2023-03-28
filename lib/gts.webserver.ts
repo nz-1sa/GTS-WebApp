@@ -274,25 +274,25 @@ export class WebServerHelper{
 		// serve files from the admin directory if are logged in
 		webapp.get('/admin*', async (req, res) => {
 			let timeStart:number = new Date().getTime();
-			let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','');
+			let resp:WebResponse = new WebResponse(false, 'Just Init', '','');
 			let uuid:string = await web.getUUID();
 			try{
 				// return an error if we could not get an uuid
 				if(uuid.startsWith('ERROR:')){
 					console.error(uuid);
-					resp = new WS.WebResponse(false, 'Could not generate unique uuid', '','');
+					resp = new WebResponse(false, 'Could not generate unique uuid', '','');
 				} else {
 					let requestIp:string = req.ip;
 					let cookies:GTS.DM.HashTable<string> = req.cookies;
 					let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
 					if(!isLoggedIn){
-						resp = new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login`,'');
+						resp = new WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login`,'');
 					} else {
 						let url = req.originalUrl.replace('\\','/');
 						if(!(url=='/admin' || url.startsWith('/admin/'))){
-							resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
+							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
-							resp = handleServeFile(web, res, url);
+							resp = this.handleServeFile(web, res, url);
 						}
 					}
 				}
@@ -300,7 +300,7 @@ export class WebServerHelper{
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
-				let storeLog:GTS.DM.WrappedResult<void> = await WS.DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
 				if(storeLog.error){
 					console.error('unable to store log of admin request');
 					console.error(storeLog.message);
@@ -318,31 +318,31 @@ export class WebServerHelper{
 		// serve files from the public directory
 		webapp.get('/*', async (req, res) => {
 			let timeStart:number = new Date().getTime();
-			let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','');
+			let resp:WebResponse = new WebResponse(false, 'Just Init', '','');
 			let uuid:string = await web.getUUID();
 			try{
 				// return an error if we could not get an uuid
 				if(uuid.startsWith('ERROR:')){
 					console.error(uuid);
-					resp = new WS.WebResponse(false, 'Could not generate unique uuid', '','');
+					resp = new WebResponse(false, 'Could not generate unique uuid', '','');
 				} else {
 					let requestIp:string = req.ip;
 					let cookies:GTS.DM.HashTable<string> = req.cookies;
 					let isLoggedIn:boolean = await Session.isLoggedIn(uuid, requestIp, cookies);
 					let url = req.originalUrl.replace('\\','/');
 					if(url=='/admin' || url.startsWith('/admin/')){
-						resp = new WS.WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access admin from rootFiles handler`,'');
+						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access admin from rootFiles handler`,'');
 					}else if(url=='/api' || url.startsWith('/api/')){
-						resp = new WS.WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
+						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
-						resp = handleServeFile(web, res, url);
+						resp = this.handleServeFile(web, res, url);
 					}
 				}
 				if(!resp.success){ res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
-				let storeLog:GTS.DM.WrappedResult<void> = await WS.DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
 				if(storeLog.error){
 					console.error('unable to store log of site request');
 					console.error(storeLog.message);
@@ -355,10 +355,10 @@ export class WebServerHelper{
 		});
 	}
 	
-	private async handleServeFile(web:WebServerHelper, res, url:string):WS.WebResponse {
+	private async handleServeFile(web:WebServerHelper, res, url:string):WebResponse {
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
-			return new WS.WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
+			return new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
 		}
 		// strip params off url to find filename
 		if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
@@ -367,30 +367,30 @@ export class WebServerHelper{
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
 			ejs.renderFile(ejsRootFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
-					return new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
+					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
 					res.send(result);
-					return new WS.WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'');
+					return new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'');
 				}
 			});
 		}
 		if(fs.existsSync(ejsFile)) {
 			ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
-					return new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
+					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
 					res.send(result);
-					return new WS.WebResponse(true, '',`UUID:${uuid} Rendered ejs`,'');
+					return new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,'');
 				}
 			});
 		}
 		if(url.endsWith('.ejs')){
-			return new WS.WebResponse(false, 'ERROR: Problem serving ejs file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
+			return new WebResponse(false, 'ERROR: Problem serving ejs file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
 		} else if(fs.existsSync(web.getFile(url))){
 			res.sendFile( web.getFile(url) );
-			return new WS.WebResponse(true, '',`UUID:${uuid} Served static file`,'');
+			return new WebResponse(true, '',`UUID:${uuid} Served static file`,'');
 		} else {
-			return new WS.WebResponse(false, 'ERROR: Problem serving file',`UUID:${uuid} Requested file doesn't exist`,url);
+			return new WebResponse(false, 'ERROR: Problem serving file',`UUID:${uuid} Requested file doesn't exist`,url);
 		}
 	}
 	
