@@ -300,7 +300,7 @@ export class WebServerHelper{
 						}
 					}
 				}
-				if(!resp.success){ console.log('sending error'); res.send(resp.toString()); }
+				if(!resp.success){ console.log('sending error message'); res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
@@ -373,7 +373,7 @@ export class WebServerHelper{
 				if( err ){
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
-					res.send(result);
+					await res.send(result);
 					return new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'');
 				}
 			});
@@ -383,7 +383,7 @@ export class WebServerHelper{
 				if( err ){
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
-					res.send(result);
+					await res.send(result);
 					return new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,'');
 				}
 			});
@@ -391,7 +391,7 @@ export class WebServerHelper{
 		if(url.endsWith('.ejs')){
 			return new WebResponse(false, 'ERROR: Problem serving ejs file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
 		} else if(fs.existsSync(web.getFile(url))){
-			res.sendFile( web.getFile(url) );
+			await res.sendFile( web.getFile(url) );
 			return new WebResponse(true, '',`UUID:${uuid} Served static file`,'');
 		} else {
 			return new WebResponse(false, 'ERROR: Problem serving file',`UUID:${uuid} Requested file doesn't exist`,url);
