@@ -3,7 +3,10 @@ import * as DBCore from "./gts.db";
 import * as UUID from "./gts.uuid";
 import { Concurrency } from "./gts.concurrency";
 import * as Express from 'express';
+
 const PATH = require('path');
+const ejs = require('ejs');
+const fs = require('fs');
 
 export interface IAdminHandlerFunction {
 	(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, params:GTS.DM.JSONValue):Promise<WebResponse>;
@@ -292,7 +295,7 @@ export class WebServerHelper{
 						if(!(url=='/admin' || url.startsWith('/admin/'))){
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
-							resp = this.handleServeFile(web, res, url);
+							resp = this.handleServeFile(web, res, url, uuid);
 						}
 					}
 				}
@@ -300,7 +303,7 @@ export class WebServerHelper{
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
-				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', resp.success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
 				if(storeLog.error){
 					console.error('unable to store log of admin request');
 					console.error(storeLog.message);
@@ -335,14 +338,14 @@ export class WebServerHelper{
 					}else if(url=='/api' || url.startsWith('/api/')){
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
-						resp = this.handleServeFile(web, res, url);
+						resp = this.handleServeFile(web, res, url, uuid);
 					}
 				}
 				if(!resp.success){ res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
-				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
+				let storeLog:GTS.DM.WrappedResult<void> = await DB.addWeblog(uuid, req.originalUrl, '', resp.success, (timeEnd-timeStart)/1000, resp.logMessage, resp.errorMessage);
 				if(storeLog.error){
 					console.error('unable to store log of site request');
 					console.error(storeLog.message);
@@ -355,7 +358,7 @@ export class WebServerHelper{
 		});
 	}
 	
-	private async handleServeFile(web:WebServerHelper, res, url:string):WebResponse {
+	private async handleServeFile(web:WebServerHelper, res, url:string, uuid:string):Promise<WebResponse> {
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
 			return new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
