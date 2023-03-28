@@ -57,7 +57,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 			// free db resources for the request
 			await DBCore.releaseConnection(uuid);
 			// release the uuid from the register of those in use
-			this.releaseUUID(uuid);
+			web.releaseUUID(uuid);
 		}
 	});
 	
