@@ -12,7 +12,7 @@ const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 
-export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
+export async function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
 		
 	// serve login page from project root
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
@@ -21,13 +21,13 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get('/admin/*', (req, res) => {
 		let timeStart:number = new Date().getTime();
 		let success:boolean = false;
-		let resp:WS.WebResponse = new WebResponse(false, 'Just Init', '','')
+		let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','')
 		try{
-			let uuid:string = web.getUUID();
+			let uuid:string = await web.getUUID();
 			// return an error if we could not get an uuid
 			if(uuid.startsWith('ERROR:')){
 				console.error(uuid);
-				resp = new WebResponse(false, 'Could not generate unique uuid', '','');
+				resp = new WS.WebResponse(false, 'Could not generate unique uuid', '','');
 			} else {
 				let requestIp:string = req.ip;
 				let cookies:GTS.DM.HashTable<string> = req.cookies;
