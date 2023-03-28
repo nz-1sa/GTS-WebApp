@@ -19,7 +19,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	
 	web.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
 		if(!Session.isLoggedIn(uuid, requestIp, cookies)){
-			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `);
+			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `,'');
 		}
 		return new WS.WebResponse(true, '',`UUID:${uuid} Testing code for admin files`,`url is ${url}`);
 	});
