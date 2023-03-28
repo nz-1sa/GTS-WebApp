@@ -369,7 +369,7 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-			ejs.renderFile(ejsRootFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
+			ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
@@ -379,7 +379,7 @@ export class WebServerHelper{
 			});
 		}
 		if(fs.existsSync(ejsFile)) {
-			ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
+			ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
