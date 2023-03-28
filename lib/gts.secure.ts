@@ -17,28 +17,35 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	// serve login page from project root
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
+	webapp.registerHandlerGet(webapp, '/admin/*', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+		if(!Session.isLoggedIn(uuid, requestIp, cookies){
+			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `);
+		}
+		=> res.sendFile( WEB.getFile( 'index.html' ) ) );
+	}
+	
 	// a captcha is shown as part of starting a session
-	web.registerHandlerGet(webapp, '/api/startSession', [], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
+	web.registerHandlerGet(webapp, '/api/startSession', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
 		return await handleStartSessionRequest(uuid, requestIp, cookies);
 	});
 	
 	// login by ident, password, and captcha
-	web.registerHandlerPost(webapp, '/api/login', ['ident','challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, ident:string, challenge:string){
+	web.registerHandlerPost(webapp, '/api/login', ['ident','challenge'], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>, ident:string, challenge:string){
 		return await handleLoginRequest(uuid, requestIp, cookies, ident, challenge);
 	});
 	
 	// log out of account
-	web.registerHandlerPost(webapp, '/api/logout', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
+	web.registerHandlerPost(webapp, '/api/logout', ['challenge'], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
 		return await handleLogoutRequest(uuid, requestIp, cookies, challenge);
 	});
 	
 	// get current talk sequence for account
-	web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
+	web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>, challenge:string){
 		return await handleSequenceRequest(uuid, requestIp, cookies, challenge);
 	});
 	
 	//NOTE: requests to the server must be received in sequence. Message is encrypted
-	web.registerHandlerPost(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
+	web.registerHandlerPost(webapp, '/api/talk', ['sequence','message'], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>, sequence:string, message:string){
 		return await handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
 	});
 }
