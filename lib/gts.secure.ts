@@ -12,13 +12,13 @@ const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 
-export async function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
+export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
 		
 	// serve login page from project root
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
 	// serve files from the admin directory if are logged in
-	webapp.get('/admin/*', (req, res) => {
+	webapp.get('/admin/*', async (req, res) => {
 		let timeStart:number = new Date().getTime();
 		let success:boolean = false;
 		let resp:WS.WebResponse = new WS.WebResponse(false, 'Just Init', '','')
