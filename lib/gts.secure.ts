@@ -53,11 +53,13 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 								success = true;
 							}
 						});
+					} else if(url.endsWith('.ejs')){
+						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Will not serve un-rendered ejs files`,err);
 					} else if(fs.existsSync(web.getFile(url))){
 						res.sendFile( web.getFile(url) );
 						success = true;
 					} else {
-						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve ejs file',`UUID:${uuid} Requested ejs file doesn't exist`,url);
+						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Requested admin file doesn't exist`,url);
 					}
 				}
 			}
@@ -542,7 +544,7 @@ export class Session{
 		if( fetchConn.data == null ){ console.log('db error, null connection returned'); return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
 		//console.log('got db client');
-		const res = await client.query( 'UPDATE sessions SET status = 4 WHERE EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
+		const res = await client.query( 'UPDATE sessions SET status = 4 WHERE status < 4 AND EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
 		//console.log('awaited db query');
 		return retval.setData( res.rowCount == 0 );
 	}
