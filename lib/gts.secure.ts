@@ -18,7 +18,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
 	
 	// serve files from the admin directory if are logged in
-	webapp.get('/admin/*', (req, res){
+	webapp.get('/admin/*', (req, res) => {
 		let timeStart:number = new Date().getTime();
 		let success:boolean = false;
 		let resp:WS.WebResponse = new WebResponse(false, 'Just Init', '','')
@@ -42,7 +42,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 						resp = new WS.WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 					}
 					if(url.indexOf('?')>=0){url = url.substring(0,url.indexOf('?'));}
-					res.sendFile( web.getFile( url ) ) );
+					res.sendFile( web.getFile( url ) );
 					success = true;
 				}
 			}
