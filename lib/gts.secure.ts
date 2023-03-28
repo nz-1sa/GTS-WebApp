@@ -21,7 +21,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 		if(!Session.isLoggedIn(uuid, requestIp, cookies)){
 			return new WS.WebResponse(false, 'ERROR: You need to be logged in to access the admin',`UUID:${uuid} Trying to access admin without login `);
 		}
-		=> res.sendFile( WEB.getFile( 'index.html' ) ) );
+		return new WS.WebResponse(true, '',`UUID:${uuid} Testing code for admin files`,`url is ${url}`);
 	}
 	
 	// a captcha is shown as part of starting a session
