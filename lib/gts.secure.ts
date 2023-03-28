@@ -68,8 +68,8 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					} else if(url.endsWith('.ejs')){
 						console.log('block serving of unrendered ejs');
 						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
-					} else if(fs.existsSync(web.getFile(url
-						console.log('serve admin file');
+					} else if(fs.existsSync(web.getFile(url))){
+						console.log('block serving of unrendered ejs');
 						res.sendFile( web.getFile(url) );
 						success = true;
 					} else {
