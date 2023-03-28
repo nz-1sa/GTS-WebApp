@@ -46,6 +46,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 					let ejsFile:string = web.getFile(url+'.ejs');
 					let ejsRootFile:string = web.getFile(url+'/.ejs');
 					if(fs.existsSync(ejsFile)) {
+						console.log('render ejs');
 						ejs.renderFile(ejsFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 							if( err ){
 								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
@@ -55,6 +56,7 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 							}
 						});
 					} else if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
+						console.log('render root ejs');
 						ejs.renderFile(ejsRootFile, {}, {}, function(err:string, result:string){	// renderFile( filename, data, options
 							if( err ){
 								resp = new WS.WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
@@ -64,8 +66,10 @@ export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Applic
 							}
 						});
 					} else if(url.endsWith('.ejs')){
+						console.log('block serving of unrendered ejs');
 						resp = new WS.WebResponse(false, 'ERROR: Can\'t serve admin file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
-					} else if(fs.existsSync(web.getFile(url))){
+					} else if(fs.existsSync(web.getFile(url
+						console.log('serve admin file');
 						res.sendFile( web.getFile(url) );
 						success = true;
 					} else {
