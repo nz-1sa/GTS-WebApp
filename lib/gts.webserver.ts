@@ -300,7 +300,7 @@ export class WebServerHelper{
 						}
 					}
 				}
-				if(!resp.success){ res.send(resp.toString()); }
+				if(!resp.success){ console.log('sending error'); res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
