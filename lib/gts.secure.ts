@@ -558,7 +558,7 @@ export class Session{
 		if( fetchConn.data == null ){ console.log('db error, null connection returned'); return retval.setError( 'DB Connection NULL error' ); }
 		let client:DBCore.Client = fetchConn.data;
 		//console.log('got db client');
-		const res = await client.query( 'UPDATE sessions SET status = 4 WHERE status < 4 AND EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
+		const res = await client.query( 'UPDATE sessions SET status = 4 WHERE status < 3 AND EXTRACT(EPOCH FROM (now() - lastseen)) > 600;' );
 		//console.log('awaited db query');
 		return retval.setData( res.rowCount == 0 );
 	}
