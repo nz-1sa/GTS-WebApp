@@ -409,6 +409,7 @@ export class WebServerHelper{
 					});
 				});
 				let b:boolean = await p;
+				console.log('reading .ebs.json finished');
 			}
 
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {

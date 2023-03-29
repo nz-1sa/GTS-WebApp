@@ -467,6 +467,7 @@ class WebServerHelper {
                         });
                     });
                     let b = yield p;
+                    console.log('reading .ebs.json finished');
                 }
                 let p = new Promise(function (resolve, reject) {
                     console.log('data given to ejs file for render is ');
