@@ -375,8 +375,8 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-			let resolveError:Function = {};
-			let resolveRendered:Function = {};
+			let resolveError:Function = ()=>{ return false; };
+			let resolveRendered:Function = ()=>{ return false; };
 			const pError:Promise<WebResponse> = new Promise((resolve) =>{resolveError=resolve;});
 			const pRendered:Promise<WebResponse> = new Promise((resolve) =>{resolveRendered=resolve;});
 			
@@ -393,7 +393,7 @@ export class WebServerHelper{
 			});
 			
 			const promises = [pError,pRendered];
-			let wr:WebResponse = await Promise.any(promises);
+			let wr:WebResponse = await new Promise(() => {}).any(promises);
 			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
