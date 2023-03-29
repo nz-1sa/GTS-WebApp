@@ -348,7 +348,8 @@ class WebServerHelper {
                     let cookies = req.cookies;
                     let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
                     if (!isLoggedIn) {
-                        resp = new WebResponse(false, 'ERROR: You need to be logged in to access the admin', `UUID:${uuid} Trying to access admin without login`, '');
+                        res.status(401).end();
+                        resp = new WebResponse(true, '401 Unauthorised', `UUID:${uuid} Trying to access admin without login`, '');
                     }
                     else {
                         let url = req.originalUrl.replace('\\', '/');
