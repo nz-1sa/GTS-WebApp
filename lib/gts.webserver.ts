@@ -314,9 +314,7 @@ export class WebServerHelper{
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
 							console.log('process admin file request');
-							const [hs, s] = await Secure.Session.hasSession(uuid, requestIp, cookies);
-							let sessionId:string = hs?s!.sessionId : '';
-							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:sessionId, isLoggedIn:isLoggedIn, data:{}});
+							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:'', isLoggedIn:isLoggedIn, data:{}});
 						}
 					}
 				}
@@ -361,9 +359,7 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						const [hs, s] = await Secure.Session.hasSession(uuid, requestIp, cookies);
-						let sessionId:string = hs?s!.sessionId : '';
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:sessionId, isLoggedIn:isLoggedIn, data:{}});
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:'', isLoggedIn:isLoggedIn, data:{}});
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
@@ -422,19 +418,28 @@ export class WebServerHelper{
 				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsRootFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
 				renderEnvSettings.data = data;
 			}
+			/*renderEnvSettings.sessionId = await Secure.getSessionId(uuid,renderEnvSettings.requestIp,renderEnvSettings.cookies);
+			let returnCookies:Cookie[] = [];
+			if(renderEnvSettings.cookies['session']==undefined){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
 					if( err ){
 						console.log('error rendering root ejs');
 						console.log(err);
-						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
+						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err,returnCookies));
 					} else {
+						if(returnCookies != undefined && returnCookies.length > 0){
+							for(var i:number=0; i<returnCookies.length; i++){
+								let c: Cookie = returnCookies[i];
+								res.cookie(c.name, c.value, c.getOptions());
+							}
+						}
 						await res.send(result);
-						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,''));
+						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'',returnCookies));
 					}
 				});
-			});
-			let wr:WebResponse = await p;
+			}); */
+			let wr:WebResponse = await this.serveEjsFile(uuid, res, ejsRootFile, renderEnvSettings);
 			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
@@ -442,7 +447,7 @@ export class WebServerHelper{
 				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
 				renderEnvSettings.data = data;
 			}
-			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+			/*let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
 					if( err ){
 						console.log('error rendering ejs');
@@ -453,8 +458,8 @@ export class WebServerHelper{
 						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
 					}
 				});
-			});
-			let wr:WebResponse = await p;
+			});*/
+			let wr:WebResponse =  await this.serveEjsFile(uuid, res, ejsFile, renderEnvSettings);
 			return wr;
 		}
 		if(url.endsWith('.ejs')){
@@ -470,6 +475,39 @@ export class WebServerHelper{
 			res.status(404).end();	// send 404 not found
 			return new WebResponse(true, 'ERROR: 404',`UUID:${uuid} Requested file doesn't exist`,url);	// return true so WebResponse is only logged, not sent as we already sent 404
 		}
+	}
+	
+	private async serveEjsFile(uuid:string, res:Express.Response, ejsFile:string, renderEnvSettings:RenderEnvSettings):Promise<WebResponse>{
+		// make sessionId available. start new sesion if need be
+		renderEnvSettings.sessionId = await Secure.getSessionId(renderEnvSettings.uuid,renderEnvSettings.requestIp,renderEnvSettings.cookies);
+		let returnCookies:Cookie[] = [];
+		// save session cookie in response if session has just been created
+		if(renderEnvSettings.cookies['session']==undefined){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
+		// synchronously render the file to the response. Return a WebResponse for logging and error reporting
+		let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+			// ejs.renderFile( filename, data, options, callback
+			ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){
+				if( err ){
+					console.log('error rendering root ejs');
+					console.log(err);
+					resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err,returnCookies));
+				} else {
+					// send the cookies to the response
+					if(returnCookies != undefined && returnCookies.length > 0){
+						for(var i:number=0; i<returnCookies.length; i++){
+							let c: Cookie = returnCookies[i];
+							res.cookie(c.name, c.value, c.getOptions());
+						}
+					}
+					// send the file to the response
+					await res.send(result);
+					// return webresponse for logging
+					resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'',returnCookies));
+				}
+			});
+		});
+		let wr:WebResponse = await p;
+		return wr;
 	}
 	
 	// attach code to view and prune weblogs

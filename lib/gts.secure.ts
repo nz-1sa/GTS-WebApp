@@ -56,8 +56,27 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 		console.log('early exit, session already intialised');
 		return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`,`<img src="/captchas/${cookies['session']}.gif">`, []);
 	}
-	let now:Date = new Date();
 	
+	let sessionId:string = await getSessionId(uuid,requestIp,cookies);
+	if(sessionId.length==0){
+		return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
+	}
+	
+	//console.log('established session object');
+	console.log('handleStartSessionRequest yields session '+sessionId);
+	
+	//console.log('new session being returned');
+	return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
+}
+
+// get the id of a session. start a session if need be
+export async function getSessionId(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<string>{
+	const [hs, s] = await Session.hasSession(uuid, requestIp, cookies);
+	if(hs && s){
+		return s.sessionId;
+	}
+	// start a session
+	let now:Date = new Date();
 	const loopSafety:number = 20;
 	let loopIteration:number = 1;
 	let sessionId:string = uuid;
@@ -68,18 +87,14 @@ async function handleStartSessionRequest(uuid:string, requestIp:string, cookies:
 	}
 	if(loopIteration == loopSafety){
 		console.log('loop safety break on session id generation');
-		return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`,`Unable to initialise session. Try again later.`, []);
+		return '';
 	}
-	//console.log('got session id');
-	// pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonceBase:number, pLogoutSeed:number, pSeqReqSeed:number, pPassword:string, pSeq:string, pChkSum:string
+	// new Session(pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonceBase:number, pLogoutSeed:number, pSeqReqSeed:number, pPassword:string, pSeq:string, pChkSum:string
 	let ns:Session = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 1, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
-	//console.log('established session object');
-	console.log('handleStartSessionRequest yields session '+uuid);
 	ns.addToDB(uuid);
-	//console.log('session added to db');
+	// create captcha and image to show it
 	ns.initialiseCaptcha(uuid, sessionId);
-	//console.log('new session being returned');
-	return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`,`<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session',sessionId)]);
+	return sessionId;
 }
 
 // process login for a session

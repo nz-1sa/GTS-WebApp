@@ -23,6 +23,7 @@ export declare class WebServerHelper {
     attachRootFiles(web: WebServerHelper, webapp: Express.Application): void;
     private readSettingsFile;
     private handleServeFile;
+    private serveEjsFile;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
     private requireTransactionHash;
     private requireNetwork;

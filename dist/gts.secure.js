@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoginAccount = exports.Session = exports.SessionStatus = exports.attachWebInterface = void 0;
+exports.LoginAccount = exports.Session = exports.SessionStatus = exports.getSessionId = exports.attachWebInterface = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
@@ -92,6 +92,24 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
             console.log('early exit, session already intialised');
             return new WS.WebResponse(true, "", `UUID:${uuid} Request to start already initialised session ${cookies['session']}`, `<img src="/captchas/${cookies['session']}.gif">`, []);
         }
+        let sessionId = yield getSessionId(uuid, requestIp, cookies);
+        if (sessionId.length == 0) {
+            return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
+        }
+        //console.log('established session object');
+        console.log('handleStartSessionRequest yields session ' + sessionId);
+        //console.log('new session being returned');
+        return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
+    });
+}
+// get the id of a session. start a session if need be
+function getSessionId(uuid, requestIp, cookies) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const [hs, s] = yield Session.hasSession(uuid, requestIp, cookies);
+        if (hs && s) {
+            return s.sessionId;
+        }
+        // start a session
         let now = new Date();
         const loopSafety = 20;
         let loopIteration = 1;
@@ -103,20 +121,17 @@ function handleStartSessionRequest(uuid, requestIp, cookies) {
         }
         if (loopIteration == loopSafety) {
             console.log('loop safety break on session id generation');
-            return new WS.WebResponse(false, "", `UUID:${uuid} Unable to initialse session`, `Unable to initialise session. Try again later.`, []);
+            return '';
         }
-        //console.log('got session id');
-        // pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonceBase:number, pLogoutSeed:number, pSeqReqSeed:number, pPassword:string, pSeq:string, pChkSum:string
+        // new Session(pId:number, pSessionId:string, pCreated:Date, pLastSeen:Date, pIp:string, pStatus:number, pCaptcha:number, pNonceBase:number, pLogoutSeed:number, pSeqReqSeed:number, pPassword:string, pSeq:string, pChkSum:string
         let ns = new Session(0, sessionId, now, now, requestIp, SessionStatus.Initialised, 0, 1, 1, 1, 'NONEnoneNONEnone', 1, 'NEWnewNEWnewNEWnewNEWnewNEW=');
-        //console.log('established session object');
-        console.log('handleStartSessionRequest yields session ' + uuid);
         ns.addToDB(uuid);
-        //console.log('session added to db');
+        // create captcha and image to show it
         ns.initialiseCaptcha(uuid, sessionId);
-        //console.log('new session being returned');
-        return new WS.WebResponse(true, "", `UUID:${uuid} Captcha Drawn`, `<img src="/captchas/${sessionId}.gif">`, [new WS.Cookie('session', sessionId)]);
+        return sessionId;
     });
 }
+exports.getSessionId = getSessionId;
 // process login for a session
 function handleLoginRequest(uuid, requestIp, cookies, ident, challenge) {
     return __awaiter(this, void 0, void 0, function* () {

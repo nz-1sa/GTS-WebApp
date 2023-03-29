@@ -359,9 +359,7 @@ class WebServerHelper {
                         }
                         else {
                             console.log('process admin file request');
-                            const [hs, s] = yield Secure.Session.hasSession(uuid, requestIp, cookies);
-                            let sessionId = hs ? s.sessionId : '';
-                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: sessionId, isLoggedIn: isLoggedIn, data: {} });
+                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
                         }
                     }
                 }
@@ -412,9 +410,7 @@ class WebServerHelper {
                     }
                     else {
                         console.log('process root file request');
-                        const [hs, s] = yield Secure.Session.hasSession(uuid, requestIp, cookies);
-                        let sessionId = hs ? s.sessionId : '';
-                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: sessionId, isLoggedIn: isLoggedIn, data: {} });
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
                     }
                 }
                 if (!resp.success) {
@@ -481,22 +477,28 @@ class WebServerHelper {
                     let data = yield this.readSettingsFile(ejsRootFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
                     renderEnvSettings.data = data;
                 }
-                let p = new Promise(function (resolve, reject) {
-                    ejs.renderFile(ejsRootFile, renderEnvSettings, {}, function (err, result) {
-                        return __awaiter(this, void 0, void 0, function* () {
-                            if (err) {
-                                console.log('error rendering root ejs');
-                                console.log(err);
-                                resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
+                /*renderEnvSettings.sessionId = await Secure.getSessionId(uuid,renderEnvSettings.requestIp,renderEnvSettings.cookies);
+                let returnCookies:Cookie[] = [];
+                if(renderEnvSettings.cookies['session']==undefined){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
+                let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+                    ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
+                        if( err ){
+                            console.log('error rendering root ejs');
+                            console.log(err);
+                            resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err,returnCookies));
+                        } else {
+                            if(returnCookies != undefined && returnCookies.length > 0){
+                                for(var i:number=0; i<returnCookies.length; i++){
+                                    let c: Cookie = returnCookies[i];
+                                    res.cookie(c.name, c.value, c.getOptions());
+                                }
                             }
-                            else {
-                                yield res.send(result);
-                                resolve(new WebResponse(true, '', `UUID:${uuid} Rendered root ejs`, ''));
-                            }
-                        });
+                            await res.send(result);
+                            resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'',returnCookies));
+                        }
                     });
-                });
-                let wr = yield p;
+                }); */
+                let wr = yield this.serveEjsFile(uuid, res, ejsRootFile, renderEnvSettings);
                 return wr;
             }
             if (fs.existsSync(ejsFile)) {
@@ -504,22 +506,19 @@ class WebServerHelper {
                     let data = yield this.readSettingsFile(ejsFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
                     renderEnvSettings.data = data;
                 }
-                let p = new Promise(function (resolve, reject) {
-                    ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
-                        return __awaiter(this, void 0, void 0, function* () {
-                            if (err) {
-                                console.log('error rendering ejs');
-                                console.log(err);
-                                resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
-                            }
-                            else {
-                                yield res.send(result);
-                                resolve(new WebResponse(true, '', `UUID:${uuid} Rendered ejs`, ''));
-                            }
-                        });
+                /*let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+                    ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
+                        if( err ){
+                            console.log('error rendering ejs');
+                            console.log(err);
+                            resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
+                        } else {
+                            await res.send(result);
+                            resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
+                        }
                     });
-                });
-                let wr = yield p;
+                });*/
+                let wr = yield this.serveEjsFile(uuid, res, ejsFile, renderEnvSettings);
                 return wr;
             }
             if (url.endsWith('.ejs')) {
@@ -537,6 +536,45 @@ class WebServerHelper {
                 res.status(404).end(); // send 404 not found
                 return new WebResponse(true, 'ERROR: 404', `UUID:${uuid} Requested file doesn't exist`, url); // return true so WebResponse is only logged, not sent as we already sent 404
             }
+        });
+    }
+    serveEjsFile(uuid, res, ejsFile, renderEnvSettings) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // make sessionId available. start new sesion if need be
+            renderEnvSettings.sessionId = yield Secure.getSessionId(renderEnvSettings.uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
+            let returnCookies = [];
+            // save session cookie in response if session has just been created
+            if (renderEnvSettings.cookies['session'] == undefined) {
+                returnCookies.push(new Cookie('session', renderEnvSettings.sessionId));
+            }
+            // synchronously render the file to the response. Return a WebResponse for logging and error reporting
+            let p = new Promise(function (resolve, reject) {
+                // ejs.renderFile( filename, data, options, callback
+                ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        if (err) {
+                            console.log('error rendering root ejs');
+                            console.log(err);
+                            resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err, returnCookies));
+                        }
+                        else {
+                            // send the cookies to the response
+                            if (returnCookies != undefined && returnCookies.length > 0) {
+                                for (var i = 0; i < returnCookies.length; i++) {
+                                    let c = returnCookies[i];
+                                    res.cookie(c.name, c.value, c.getOptions());
+                                }
+                            }
+                            // send the file to the response
+                            yield res.send(result);
+                            // return webresponse for logging
+                            resolve(new WebResponse(true, '', `UUID:${uuid} Rendered root ejs`, '', returnCookies));
+                        }
+                    });
+                });
+            });
+            let wr = yield p;
+            return wr;
         });
     }
     // attach code to view and prune weblogs

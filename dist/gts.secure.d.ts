@@ -2,6 +2,7 @@ import * as GTS from "./gts";
 import * as WS from "./gts.webserver";
 import * as Express from 'express';
 export declare function attachWebInterface(web: WS.WebServerHelper, webapp: Express.Application): void;
+export declare function getSessionId(uuid: string, requestIp: string, cookies: GTS.DM.HashTable<string>): Promise<string>;
 export declare enum SessionStatus {
     Initialised = 1,
     LoggedIn = 2,
