@@ -461,7 +461,8 @@ export class WebServerHelper{
 			return new WebResponse(true, '',`UUID:${uuid} Served static file`,'');
 		} else {
 			console.log('file not exist');
-			return new WebResponse(false, 'ERROR: Problem serving file',`UUID:${uuid} Requested file doesn't exist`,url);
+			res.status(404).end();	// send 404 not found
+			return new WebResponse(true, 'ERROR: 404',`UUID:${uuid} Requested file doesn't exist`,url);	// return true so WebResponse is only logged, not sent as we already sent 404
 		}
 	}
 	
