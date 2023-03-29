@@ -277,6 +277,7 @@ export class WebServerHelper{
 	public attachAdminFiles(web:WebServerHelper, webapp:Express.Application):void{
 		// serve files from the admin directory if are logged in
 		webapp.get('/admin*', async (req, res) => {
+			console.log('admin file handler');
 			let timeStart:number = new Date().getTime();
 			let resp:WebResponse = new WebResponse(false, 'Just Init', '','');
 			let uuid:string = await web.getUUID();
@@ -321,6 +322,7 @@ export class WebServerHelper{
 	public attachRootFiles(web:WebServerHelper, webapp:Express.Application):void{
 		// serve files from the public directory
 		webapp.get('/*', async (req:Express.Request, res:Express.Response) => {
+			console.log('public file handler');
 			let timeStart:number = new Date().getTime();
 			let resp:WebResponse = new WebResponse(false, 'Just Init', '','');
 			let uuid:string = await web.getUUID();
