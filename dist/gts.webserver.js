@@ -469,6 +469,8 @@ class WebServerHelper {
                     let b = yield p;
                 }
                 let p = new Promise(function (resolve, reject) {
+                    console.log('data given to ejs file for render is ');
+                    console.log(renderEnvSettings.data);
                     ejs.renderFile(ejsRootFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (err) {

@@ -412,6 +412,8 @@ export class WebServerHelper{
 			}
 
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+				console.log('data given to ejs file for render is ');
+				console.log(renderEnvSettings.data);
 				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering root ejs');
