@@ -339,7 +339,7 @@ export class WebServerHelper{
 					}else if(url=='/api' || url.startsWith('/api/')){
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
-						resp = await this.handleServeFile(web, res, url, uuid);
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid);
 					}
 				}
 				if(!resp.success){ res.send(resp.toString()); }
