@@ -15,8 +15,7 @@ const fs = require('fs');
 
 export function attachWebInterface(web:WS.WebServerHelper, webapp:Express.Application):void{
 		
-	// serve login page from project root
-	webapp.get( '/login', ( req, res ) => res.sendFile( web.getFile( 'login.html' ) ) );
+	// login.ejs will serve from public files as /login
 	
 	// a captcha is shown as part of starting a session
 	web.registerHandlerGet(webapp, '/api/startSession', [], async function(uuid:string, url:string, requestIp:string, cookies:GTS.DM.HashTable<string>){
