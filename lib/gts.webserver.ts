@@ -387,6 +387,7 @@ export class WebServerHelper{
 				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering root ejs');
+						console.log(err);
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 					} else {
 						console.log('rendering root ejs');
@@ -404,6 +405,7 @@ export class WebServerHelper{
 				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering ejs');
+						console.log(err);
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 					} else {
 						console.log('rendering ejs');
