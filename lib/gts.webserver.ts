@@ -392,7 +392,8 @@ export class WebServerHelper{
 				}
 			});
 			
-			let wr:WebResponse = await Promise<WebResponse>.any([pError,pRendered]);
+			const promises = [pError,pRendered];
+			let wr:WebResponse = await Promise.any(promises);
 			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
