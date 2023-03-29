@@ -297,11 +297,12 @@ export class WebServerHelper{
 						if(!(url=='/admin' || url.startsWith('/admin/'))){
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
+							console.log('process admin file request');
 							resp = await this.handleServeFile(web, res, url, uuid);
 						}
 					}
 				}
-				if(!resp.success){ console.log('sending error message'); res.send(resp.toString()); }
+				if(!resp.success){ console.log('sending admin error message'); res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
@@ -341,10 +342,11 @@ export class WebServerHelper{
 					}else if(url=='/api' || url.startsWith('/api/')){
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
+						console.log('process root file request');
 						resp = await this.handleServeFile(web, res, '/public'+url, uuid);
 					}
 				}
-				if(!resp.success){ res.send(resp.toString()); }
+				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
 			} finally {
 				// log the request that was served
 				let timeEnd:number = new Date().getTime();
@@ -364,6 +366,7 @@ export class WebServerHelper{
 	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string):Promise<WebResponse> {
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
+			console.log('request invalid');
 			return new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access invalid file`,'');
 		}
 		// strip params off url to find filename
@@ -373,9 +376,12 @@ export class WebServerHelper{
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
 			ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
+					console.log('error rendering root ejs');
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
+					console.log('rendering root ejs');
 					await res.send(result);
+					console.log('rendered root ejs');
 					return new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'');
 				}
 			});
@@ -383,19 +389,26 @@ export class WebServerHelper{
 		if(fs.existsSync(ejsFile)) {
 			ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
+					console.log('error rendering ejs');
 					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
 				} else {
+					console.log('rendering ejs');
 					await res.send(result);
+					console.log('rendered ejs');
 					return new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,'');
 				}
 			});
 		}
 		if(url.endsWith('.ejs')){
+			console.log('blocking server (not render) of ejs');
 			return new WebResponse(false, 'ERROR: Problem serving ejs file',`UUID:${uuid} Will not serve un-rendered ejs files`,url);
 		} else if(fs.existsSync(web.getFile(url))){
+			console.log('sending static file');
 			await res.sendFile( web.getFile(url) );
+			console.log('static file sent');
 			return new WebResponse(true, '',`UUID:${uuid} Served static file`,'');
 		} else {
+			console.log('file not exist');
 			return new WebResponse(false, 'ERROR: Problem serving file',`UUID:${uuid} Requested file doesn't exist`,url);
 		}
 	}
