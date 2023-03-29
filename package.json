@@ -22,6 +22,7 @@
     "ejs": "^3.1.9",
     "express": "^4.17.3",
     "getmac": "^5.20.0",
+    "gts-webapp": "github:nz-1sa/GTS-WebApp",
     "pg": "^8.7.3"
   }
 }

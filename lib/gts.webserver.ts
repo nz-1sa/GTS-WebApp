@@ -19,6 +19,12 @@ class RenderEnvSettings{
 	public cookies:GTS.DM.HashTable<string> = {};
 	public url:string = '';
 	public isLoggedIn:boolean = false;
+	public data:GTS.DM.HashTable<string> = {};
+}
+
+class EjsSettings{
+	public ad:string[] = [];
+	public pd:string[] = [];
 }
 
 export class WebServerHelper{
@@ -383,6 +389,25 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
+			
+			if(fs.existsSync(ejsRootFile+'.json')){
+				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
+					fs.readFile(ejsRootFile+'.json', 'utf8', (error, data) => {
+						 if(error){
+							resolve(false);
+							return;
+						 }
+						 let ejsSettings:EjsSettings = JSON.parse(data));
+						 ejsSettings.ad.foreach(function(action:string){
+							 renderEnvSettings.data[action] = await web.adminHandlers[action](dbId, requestIp, cookies, params).data;
+						 });
+						 resolve(true);
+
+					});
+				});
+				let wr:WebResponse = await p;
+			}
+
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
