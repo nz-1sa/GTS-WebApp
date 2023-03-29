@@ -429,6 +429,27 @@ export class WebServerHelper{
 			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
+			if(fs.existsSync(ejsFile+'.json')){
+				console.log('found .ejs.json');
+				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
+					fs.readFile(ejsFile+'.json', 'utf8', (error:string, data:string) => {
+						 if(error){
+							resolve(false);
+							return;
+						 }
+						 let ejsSettings:EjsSettings = JSON.parse(data);
+						 ejsSettings.ad.forEach(async function(action:string){
+							 console.log('found action '+action);
+							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+							 console.log(wrd);
+							 renderEnvSettings.data[action] = wrd.data;
+						 });
+						 resolve(true);
+					});
+				});
+				let b:boolean = await p;
+			}
+			
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){

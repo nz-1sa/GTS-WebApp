@@ -489,6 +489,28 @@ class WebServerHelper {
                 return wr;
             }
             if (fs.existsSync(ejsFile)) {
+                if (fs.existsSync(ejsFile + '.json')) {
+                    console.log('found .ejs.json');
+                    let p = new Promise(function (resolve, reject) {
+                        fs.readFile(ejsFile + '.json', 'utf8', (error, data) => {
+                            if (error) {
+                                resolve(false);
+                                return;
+                            }
+                            let ejsSettings = JSON.parse(data);
+                            ejsSettings.ad.forEach(function (action) {
+                                return __awaiter(this, void 0, void 0, function* () {
+                                    console.log('found action ' + action);
+                                    let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+                                    console.log(wrd);
+                                    renderEnvSettings.data[action] = wrd.data;
+                                });
+                            });
+                            resolve(true);
+                        });
+                    });
+                    let b = yield p;
+                }
                 let p = new Promise(function (resolve, reject) {
                     ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {
