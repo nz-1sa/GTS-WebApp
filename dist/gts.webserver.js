@@ -37,7 +37,19 @@ const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
 const gts_concurrency_1 = require("./gts.concurrency");
+const Secure = __importStar(require("./gts.secure"));
 const PATH = require('path');
+const ejs = require('ejs');
+const fs = require('fs');
+class RenderEnvSettings {
+    constructor() {
+        this.uuid = '';
+        this.requestIp = '';
+        this.cookies = {};
+        this.url = '';
+        this.isLoggedIn = false;
+    }
+}
 class WebServerHelper {
     // initialise a new uuid register when the WebServerHelper is instantiated
     constructor(pSiteRoot) {
@@ -266,7 +278,7 @@ class WebServerHelper {
                 // get the response for the request
                 let timedOut = false;
                 [response, timedOut] = yield gts_concurrency_1.Concurrency.doFuncOrTimeout(90000, function () {
-                    return __awaiter(this, void 0, void 0, function* () { return yield work(uuid, req.ip, req.cookies, ...paramVals); });
+                    return __awaiter(this, void 0, void 0, function* () { return yield work(uuid, req.originalUrl, req.ip, req.cookies, ...paramVals); });
                 });
                 if (timedOut) {
                     response = new WebResponse(false, 'ERROR: Processing request timed out', `Error, Processing request timed out while handling ${requestUrl}`, '');
@@ -307,6 +319,180 @@ class WebServerHelper {
                 yield DBCore.releaseConnection(uuid);
                 // release the uuid from the register of those in use
                 this.releaseUUID(uuid);
+            }
+        });
+    }
+    // attach code to serve admin files
+    attachAdminFiles(web, webapp) {
+        // serve files from the admin directory if are logged in
+        webapp.get('/admin*', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            console.log('admin file handler');
+            let timeStart = new Date().getTime();
+            let resp = new WebResponse(false, 'Just Init', '', '');
+            let uuid = yield web.getUUID();
+            try {
+                // return an error if we could not get an uuid
+                if (uuid.startsWith('ERROR:')) {
+                    console.error(uuid);
+                    resp = new WebResponse(false, 'Could not generate unique uuid', '', '');
+                }
+                else {
+                    let requestIp = req.ip;
+                    let cookies = req.cookies;
+                    let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
+                    if (!isLoggedIn) {
+                        resp = new WebResponse(false, 'ERROR: You need to be logged in to access the admin', `UUID:${uuid} Trying to access admin without login`, '');
+                    }
+                    else {
+                        let url = req.originalUrl.replace('\\', '/');
+                        if (!(url == '/admin' || url.startsWith('/admin/'))) {
+                            resp = new WebResponse(false, 'ERROR: Invalid admin request received', `UUID:${uuid} Trying to access invalid admin file`, '');
+                        }
+                        else {
+                            console.log('process admin file request');
+                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn });
+                        }
+                    }
+                }
+                if (!resp.success) {
+                    console.log('sending admin error message');
+                    res.send(resp.toString());
+                }
+            }
+            finally {
+                // log the request that was served
+                let timeEnd = new Date().getTime();
+                let storeLog = yield DB.addWeblog(uuid, req.originalUrl, '', resp.success, (timeEnd - timeStart) / 1000, resp.logMessage, resp.errorMessage);
+                if (storeLog.error) {
+                    console.error('unable to store log of admin request');
+                    console.error(storeLog.message);
+                }
+                // free db resources for the request
+                yield DBCore.releaseConnection(uuid);
+                // release the uuid from the register of those in use
+                web.releaseUUID(uuid);
+            }
+        }));
+    }
+    // attach code to serve normal website files
+    attachRootFiles(web, webapp) {
+        // serve files from the public directory
+        webapp.get('/*', (req, res) => __awaiter(this, void 0, void 0, function* () {
+            console.log('public file handler');
+            let timeStart = new Date().getTime();
+            let resp = new WebResponse(false, 'Just Init', '', '');
+            let uuid = yield web.getUUID();
+            try {
+                // return an error if we could not get an uuid
+                if (uuid.startsWith('ERROR:')) {
+                    console.error(uuid);
+                    resp = new WebResponse(false, 'Could not generate unique uuid', '', '');
+                }
+                else {
+                    let requestIp = req.ip;
+                    let cookies = req.cookies;
+                    let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
+                    let url = req.originalUrl.replace('\\', '/');
+                    if (url == '/admin' || url.startsWith('/admin/')) {
+                        resp = new WebResponse(false, 'ERROR: Invalid request received', `UUID:${uuid} Trying to access admin from rootFiles handler`, '');
+                    }
+                    else if (url == '/api' || url.startsWith('/api/')) {
+                        resp = new WebResponse(false, 'ERROR: Invalid request received', `UUID:${uuid} Trying to access api from rootFiles handler`, '');
+                    }
+                    else {
+                        console.log('process root file request');
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn });
+                    }
+                }
+                if (!resp.success) {
+                    console.log('sending root message');
+                    res.send(resp.toString());
+                }
+            }
+            finally {
+                // log the request that was served
+                let timeEnd = new Date().getTime();
+                let storeLog = yield DB.addWeblog(uuid, req.originalUrl, '', resp.success, (timeEnd - timeStart) / 1000, resp.logMessage, resp.errorMessage);
+                if (storeLog.error) {
+                    console.error('unable to store log of site request');
+                    console.error(storeLog.message);
+                }
+                // free db resources for the request
+                yield DBCore.releaseConnection(uuid);
+                // release the uuid from the register of those in use
+                web.releaseUUID(uuid);
+            }
+        }));
+    }
+    handleServeFile(web, res, url, uuid, renderEnvSettings) {
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('handleServeFile ' + url);
+            // stop use of .. to traverse up the diretory tree
+            if (url.indexOf('/../') >= 0) {
+                console.log('request invalid');
+                return new WebResponse(false, 'ERROR: Invalid request received', `UUID:${uuid} Trying to access invalid file`, '');
+            }
+            // strip params off url to find filename
+            if (url.indexOf('?') >= 0) {
+                url = url.substring(0, url.indexOf('?'));
+            }
+            let ejsFile = web.getFile(url + '.ejs');
+            let ejsRootFile = web.getFile(url + '/.ejs');
+            if (fs.existsSync(ejsRootFile)) { // allow default .ejs file in a folder to be served without the trailing / on the folder name
+                let p = new Promise(function (resolve, reject) {
+                    ejs.renderFile(ejsRootFile, renderEnvSettings, {}, function (err, result) {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            if (err) {
+                                console.log('error rendering root ejs');
+                                console.log(err);
+                                resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
+                            }
+                            else {
+                                console.log('rendering root ejs');
+                                yield res.send(result);
+                                console.log('rendered root ejs');
+                                resolve(new WebResponse(true, '', `UUID:${uuid} Rendered root ejs`, ''));
+                            }
+                        });
+                    });
+                });
+                let wr = yield p;
+                return wr;
+            }
+            if (fs.existsSync(ejsFile)) {
+                let p = new Promise(function (resolve, reject) {
+                    ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            if (err) {
+                                console.log('error rendering ejs');
+                                console.log(err);
+                                resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
+                            }
+                            else {
+                                console.log('rendering ejs');
+                                yield res.send(result);
+                                console.log('rendered ejs');
+                                resolve(new WebResponse(true, '', `UUID:${uuid} Rendered ejs`, ''));
+                            }
+                        });
+                    });
+                });
+                let wr = yield p;
+                return wr;
+            }
+            if (url.endsWith('.ejs')) {
+                console.log('blocking server (not render) of ejs');
+                return new WebResponse(false, 'ERROR: Problem serving ejs file', `UUID:${uuid} Will not serve un-rendered ejs files`, url);
+            }
+            else if (fs.existsSync(web.getFile(url))) {
+                console.log('sending static file');
+                yield res.sendFile(web.getFile(url));
+                console.log('static file sent');
+                return new WebResponse(true, '', `UUID:${uuid} Served static file`, '');
+            }
+            else {
+                console.log('file not exist');
+                return new WebResponse(false, 'ERROR: Problem serving file', `UUID:${uuid} Requested file doesn't exist`, url);
             }
         });
     }

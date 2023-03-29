@@ -13,12 +13,15 @@ export declare class WebServerHelper {
     registerHandlerGet(webapp: Express.Application, url: string, requiredParams: string[], work: Function): Promise<void>;
     adminHandlers: GTS.DM.HashTable<IAdminHandlerFunction>;
     registerAdminHandler(action: string, work: IAdminHandlerFunction): Promise<void>;
-    private getUUID;
-    private releaseUUID;
+    getUUID(): Promise<string>;
+    releaseUUID(uuid: string): void;
     private handleRequest;
     private handleRequestGet;
     private handleRequestPost;
     private handleRequestUnchecked;
+    attachAdminFiles(web: WebServerHelper, webapp: Express.Application): void;
+    attachRootFiles(web: WebServerHelper, webapp: Express.Application): void;
+    private handleServeFile;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
     private requireTransactionHash;
     private requireNetwork;

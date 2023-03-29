@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Session = exports.SessionStatus = exports.attachWebInterface = void 0;
+exports.LoginAccount = exports.Session = exports.SessionStatus = exports.attachWebInterface = void 0;
 const GTS = __importStar(require("./gts"));
 const DBCore = __importStar(require("./gts.db"));
 const UUID = __importStar(require("./gts.uuid"));
@@ -40,38 +40,38 @@ const WS = __importStar(require("./gts.webserver"));
 const gts_concurrency_1 = require("./gts.concurrency");
 var crypto = require('crypto');
 const Encodec = __importStar(require("./gts.encodec"));
+const ejs = require('ejs');
 const GIFEncoder = require('gifencoder');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 function attachWebInterface(web, webapp) {
-    // serve login page from project root
-    webapp.get('/login', (req, res) => res.sendFile(web.getFile('login.html')));
+    // login.ejs will serve from public files as /login
     // a captcha is shown as part of starting a session
-    web.registerHandlerGet(webapp, '/api/startSession', [], function (uuid, requestIp, cookies) {
+    web.registerHandlerGet(webapp, '/api/startSession', [], function (uuid, url, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleStartSessionRequest(uuid, requestIp, cookies);
         });
     });
     // login by ident, password, and captcha
-    web.registerHandlerPost(webapp, '/api/login', ['ident', 'challenge'], function (uuid, requestIp, cookies, ident, challenge) {
+    web.registerHandlerPost(webapp, '/api/login', ['ident', 'challenge'], function (uuid, url, requestIp, cookies, ident, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleLoginRequest(uuid, requestIp, cookies, ident, challenge);
         });
     });
     // log out of account
-    web.registerHandlerPost(webapp, '/api/logout', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+    web.registerHandlerPost(webapp, '/api/logout', ['challenge'], function (uuid, url, requestIp, cookies, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleLogoutRequest(uuid, requestIp, cookies, challenge);
         });
     });
     // get current talk sequence for account
-    web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], function (uuid, requestIp, cookies, challenge) {
+    web.registerHandlerPost(webapp, '/api/curSeq', ['challenge'], function (uuid, url, requestIp, cookies, challenge) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleSequenceRequest(uuid, requestIp, cookies, challenge);
         });
     });
     //NOTE: requests to the server must be received in sequence. Message is encrypted
-    web.registerHandlerPost(webapp, '/api/talk', ['sequence', 'message'], function (uuid, requestIp, cookies, sequence, message) {
+    web.registerHandlerPost(webapp, '/api/talk', ['sequence', 'message'], function (uuid, url, requestIp, cookies, sequence, message) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield handleSecureTalk(web, uuid, requestIp, cookies, sequence, message);
         });
@@ -137,13 +137,53 @@ function handleLoginRequest(uuid, requestIp, cookies, ident, challenge) {
             console.log('wrong session state, only can login from Initialised');
             return new WS.WebResponse(false, "ERROR: Can only login to a session once", `UUID:${uuid} Can only login to a session once`, '', []);
         }
-        //TODO: get knownSaltPassHash for ident from database
-        let knownSaltPassHash = 'GtgV3vHNK1TvAbsWNV7ioUo1QeI='; //knownSaltPassHash is the SHA1 hash of email+password, stops rainbow tables matching sha1 of just pass.
-        //console.log('using debug key to decode');
-        //console.log({knownSaltPassHash:knownSaltPassHash, captcha:sess.captcha, challenge:challenge});
+        // get login account from db
+        let la = yield LoginAccount.getPassHash(uuid, ident);
+        // la.error
+        if (la.error) {
+            console.log('wrong email ident');
+            return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, incorrect email ident`, '', []);
+        }
+        console.log(la);
+        let accountSessionId = la.data[1];
+        if (accountSessionId.length > 0) {
+            let doReject = false;
+            if (accountSessionId == sess.sessionId) {
+                console.log('error, how can account be assigned to us when we are not logged in yet (trying to do so)');
+                doReject = true;
+            }
+            else {
+                console.log('login already attached to a different session');
+                yield Session.expireOldSessionsInDB(uuid);
+                let rs = yield Session.getSessionFromDB(uuid, accountSessionId);
+                if (rs.error) {
+                    console.log('error getting attached session');
+                    console.log(rs.message);
+                    doReject = true;
+                }
+                else {
+                    let s = rs.data;
+                    if (s.status == SessionStatus.LoggedOut || s.status == SessionStatus.Expired) {
+                        console.log('clearing logged out or expired session');
+                        LoginAccount.setActiveSessionId(uuid, ident, ''); // clear active session if is for a logged out or expired session
+                    }
+                    else {
+                        console.log('attached session is ');
+                        console.log(s);
+                        doReject = true;
+                    }
+                }
+            }
+            if (doReject) {
+                return new WS.WebResponse(false, "ERROR: Login failed", `UUID:${uuid} Login failed, is already active`, '', []);
+            }
+        }
+        let knownSaltPassHash = la.data[0];
+        console.log('using hash from db');
+        console.log({ knownSaltPassHash: knownSaltPassHash, captcha: sess.captcha, challenge: challenge });
         // decrypt challenge using knownSaltPassHash and captcha
         let decoded = Encodec.decrypt(challenge, knownSaltPassHash, sess.captcha);
-        //console.log({decoded:decoded});
+        console.log({ decoded: decoded });
         if (!new RegExp("^[0-9]+$", "g").test(decoded)) {
             console.log('failed regex check');
             return new WS.WebResponse(false, "ERROR: Login failed.", `UUID:${uuid} Login failed, decoded content failed regex check.`, '', []);
@@ -170,6 +210,8 @@ function handleLoginRequest(uuid, requestIp, cookies, ident, challenge) {
         sess.seq = 1;
         sess.updateDB(uuid);
         //console.log({sess:sess});
+        // show that the login is in use (prevent dual login)
+        LoginAccount.setActiveSessionId(uuid, ident, sess.sessionId);
         // encrypt and return to client the password to use for the session, and the nonce base to start sequence from
         let plainTextResponse = new Date().getTime().toString() + JSON.stringify({ p: sess.password, n: sess.nonceBase, l: sess.logoutSeed, r: sess.seqReqSeed });
         //console.log({plainTextResponse:plainTextResponse});
@@ -518,6 +560,48 @@ class Session {
             return retval.setData(res.rowCount == 0);
         });
     }
+    // expire old sessions
+    static expireOldSessionsInDB(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            //console.log('in expireOldSessionsInDB');
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('Session.expireOldSessionsInDB', uuid);
+            if (fetchConn.error) {
+                console.log('db error ' + fetchConn.message);
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                console.log('db error, null connection returned');
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            //console.log('got db client');
+            const res = yield client.query('UPDATE sessions SET status = 4 WHERE status < 3 AND EXTRACT(EPOCH FROM (now() - lastseen)) > 600;');
+            //console.log('awaited db query');
+            return retval.setData(res.rowCount == 0);
+        });
+    }
+    // update session seen
+    static updateSessionLastSeenInDB(uuid, sessionId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            //console.log('in updateSessionLastSeenInDB');
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('Session.updateSessionLastSeenInDB', uuid);
+            if (fetchConn.error) {
+                console.log('db error ' + fetchConn.message);
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                console.log('db error, null connection returned');
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            //console.log('got db client');
+            const res = yield client.query('UPDATE sessions SET lastseen = now() WHERE sessionId = $1;', [sessionId]);
+            //console.log('awaited db query');
+            return retval.setData(res.rowCount == 0);
+        });
+    }
     // get a session from the database for the specified sessionId
     static getSessionFromDB(uuid, sessionId) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -781,6 +865,7 @@ class Session {
                 console.log('incorrect session length at hasSession check');
                 return [false, undefined];
             }
+            yield Session.expireOldSessionsInDB(uuid);
             let ws = yield Session.getSessionFromDB(uuid, cookies['session']);
             if (ws.error) {
                 console.log('failed to get session from db ' + ws.message);
@@ -799,6 +884,7 @@ class Session {
                 console.log('expired session at hasSession check');
                 return [false, undefined];
             }
+            yield Session.updateSessionLastSeenInDB(uuid, cookies['session']);
             return [true, s];
         });
     }
@@ -844,3 +930,218 @@ class Session {
     }
 }
 exports.Session = Session;
+class LoginAccount {
+    constructor(pId, pIdent, pEmail, pPassHash, pActiveSessionId, pChkSum) {
+        this.id = pId !== null && pId !== void 0 ? pId : 0;
+        this.ident = pIdent !== null && pIdent !== void 0 ? pIdent : '';
+        this.email = pEmail !== null && pEmail !== void 0 ? pEmail : '';
+        this.passHash = pPassHash !== null && pPassHash !== void 0 ? pPassHash : '';
+        this.activeSessionId = pActiveSessionId !== null && pActiveSessionId !== void 0 ? pActiveSessionId : '';
+        this.chkSum = pChkSum !== null && pChkSum !== void 0 ? pChkSum : '';
+    }
+    // base64 sha1 hash of the loginAccount's values (excludes id and chkSum).  Can compare .genHash() with .chkSum to test for if changed
+    genHash() {
+        var j = JSON.stringify({ ident: this.ident, email: this.email, passHash: this.passHash, activeSessionId: this.activeSessionId });
+        var hsh = crypto.createHash('sha1').update(j).digest('base64');
+        return hsh;
+    }
+    // cast loginAccount as a JSON string
+    toString() {
+        return JSON.stringify(this.toJSON());
+    }
+    // cast loginAccount as a JSON object
+    toJSON() {
+        return { id: this.id.toString(), ident: this.ident, email: this.email, passHash: this.passHash, activeSessionId: this.activeSessionId, chkSum: this.chkSum };
+    }
+    // casted value checks for allowed values in a loginAccount
+    verifyValuesAreValid() {
+        let errDesc = '';
+        var idIsValid = (this.id >= 0 && this.id <= 2147483600);
+        if (!idIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for id.';
+        }
+        var identIsValid = (this.ident.length >= 3 && this.ident.length <= 48);
+        if (!identIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for ident.';
+        }
+        var emailIsValid = (this.email.length >= 6 && this.email.length <= 100);
+        if (!emailIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for email.';
+        }
+        var passHashIsValid = (this.passHash.length >= 28 && this.passHash.length <= 28);
+        if (!passHashIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for passHash.';
+        }
+        var activeSessionIdIsValid = (this.activeSessionId.length >= 36 && this.activeSessionId.length <= 36);
+        if (!activeSessionIdIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for activeSessionId.';
+        }
+        var chkSumIsValid = (true);
+        if (!chkSumIsValid) {
+            if (errDesc.length > 0) {
+                errDesc = errDesc + ' ';
+            }
+            errDesc = errDesc + 'Invalid value for chkSum.';
+        }
+        return [idIsValid && identIsValid && emailIsValid && passHashIsValid && activeSessionIdIsValid && chkSumIsValid, errDesc];
+    }
+    // instantiate a loginAccount from string values. Null returned if sting values fail regex checks or casted value checks
+    static fromStrings(id, ident, email, passHash, activeSessionId, chkSum) {
+        let regexTests = [new RegExp("^[0-9]+$", "g").test(id), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(ident), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(email), new RegExp("^([A-Za-z0-9+/]{4})+(([A-Za-z0-9+/]{3}=)|([A-Za-z0-9+/]{2}==))?$", "g").test(passHash), new RegExp("^[A-Za-z\. \-,0-9=+/]+$", "g").test(activeSessionId), new RegExp("^[a-zA-Z0-9/+]{26}[a-zA-Z0-9/+=]{2}$", "g").test(chkSum)];
+        if (!regexTests.every(Boolean)) {
+            // detail invalid value
+            let paramNames = ["id", "ident", "email", "passHash", "activeSessionId", "chkSum"];
+            for (var i = 0; i < regexTests.length; i++) {
+                if (!regexTests[i]) {
+                    console.log('posted value for ' + paramNames[i] + ' fails regex check');
+                }
+            }
+            return null;
+        }
+        let loginAccount = new LoginAccount(parseInt(id), (ident), (email), (passHash), (activeSessionId), (chkSum));
+        let valueCheck = loginAccount.verifyValuesAreValid();
+        let success = valueCheck[0];
+        if (success) {
+            return loginAccount;
+        }
+        let errMsg = valueCheck[1];
+        console.log(errMsg);
+        return null;
+    }
+    // list all the loginAccounts from the database in full detail
+    static fetchAllFromDB(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let retvalData = [];
+            let fetchConn = yield DBCore.getConnection('LoginAccount.fetchAllFromDB', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('SELECT id, ident, email, passHash, activeSessionId, chkSum FROM loginAccounts;');
+            if (res.rowCount == 0) {
+                return retval.setData(retvalData);
+            } // handle empty table
+            for (let i = 0; i < res.rowCount; i++) {
+                retvalData.push(new LoginAccount(res.rows[i].id, res.rows[i].ident, res.rows[i].email, res.rows[i].passhash, res.rows[i].activesessionid, res.rows[i].chksum));
+            }
+            return retval.setData(retvalData);
+        });
+    }
+    // add a loginAccount to the database, id is assigned as it is added
+    addToDB(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('LoginAccount.addToDB', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            this.chkSum = this.genHash();
+            const res = yield client.query('CALL addLoginAccount($1,$2,$3,$4,$5,$6);', [this.ident, this.email, this.passHash, this.activeSessionId, this.chkSum, 0]);
+            if (res.rowCount == 0) {
+                return retval.setError('LoginAccount not added.');
+            }
+            this.id = res.rows[0].insertedid;
+            return retval.setData(null);
+        });
+    }
+    // update a loginAccount in the database
+    updateDB(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('LoginAccount.updateDB', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            let newChksum = this.genHash();
+            const res = yield client.query('CALL updateLoginAccount($1,$2,$3,$4,$5,$6,$7,$8);', [this.id, this.ident, this.email, this.passHash, this.activeSessionId, newChksum, this.chkSum, 0]);
+            if (res.rowCount == 0) {
+                return retval.setError('LoginAccount not updated. 0 row count.');
+            }
+            if (res.rows[0].updatestatus == 0) {
+                return retval.setError('LoginAccount not updated. ChkSum failed.');
+            }
+            this.chkSum = newChksum;
+            return retval.setData(null);
+        });
+    }
+    // delete a loginAccount from the database
+    deleteFromDB(uuid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('LoginAccount.deleteFromDB', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            yield client.query('DELETE FROM loginAccounts WHERE id=$1;', [this.id]);
+            return retval.setData();
+        });
+    }
+    static getPassHash(uuid, ident) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('LoginAccount.getPassHash', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('SELECT passhash, activesessionid FROM loginAccounts WHERE ident = $1;', [ident]);
+            if (res.rowCount == 0) {
+                return retval.setError('Account not found.');
+            }
+            return retval.setData([res.rows[0].passhash, res.rows[0].activesessionid]);
+        });
+    }
+    static setActiveSessionId(uuid, ident, activesessionid) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let retval = new GTS.DM.WrappedResult();
+            let fetchConn = yield DBCore.getConnection('LoginAccount.getPassHash', uuid);
+            if (fetchConn.error) {
+                return retval.setError('DB Connection error\n' + fetchConn.message);
+            }
+            if (fetchConn.data == null) {
+                return retval.setError('DB Connection NULL error');
+            }
+            let client = fetchConn.data;
+            const res = yield client.query('UPDATE loginaccounts SET activesessionid=$1 WHERE ident=$2;', [activesessionid, ident]);
+            if (res.rowCount == 0) {
+                return retval.setError('LoginAccount not added.');
+            }
+            return retval.setData();
+        });
+    }
+}
+exports.LoginAccount = LoginAccount;
