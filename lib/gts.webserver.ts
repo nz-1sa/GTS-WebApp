@@ -351,7 +351,7 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, equestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
