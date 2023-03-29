@@ -18,6 +18,7 @@ class RenderEnvSettings{
 	public requestIp:string = '';
 	public cookies:GTS.DM.HashTable<string> = {};
 	public url:string = '';
+	public sessionId:string = '';
 	public isLoggedIn:boolean = false;
 	public data:GTS.DM.HashTable<string> = {};
 }
@@ -313,7 +314,9 @@ export class WebServerHelper{
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
 							console.log('process admin file request');
-							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn, data:{}});
+							const [hs, s] = await Secure.Session.hasSession(uuid, requestIp, cookies);
+							let sessionId:string = hs?s!.sessionId : '';
+							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:sessionId, isLoggedIn:isLoggedIn, data:{}});
 						}
 					}
 				}
@@ -358,7 +361,9 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn, data:{}});
+						const [hs, s] = await Secure.Session.hasSession(uuid, requestIp, cookies);
+						let sessionId:string = hs?s!.sessionId : '';
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:sessionId, isLoggedIn:isLoggedIn, data:{}});
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }

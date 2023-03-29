@@ -47,6 +47,7 @@ class RenderEnvSettings {
         this.requestIp = '';
         this.cookies = {};
         this.url = '';
+        this.sessionId = '';
         this.isLoggedIn = false;
         this.data = {};
     }
@@ -358,7 +359,9 @@ class WebServerHelper {
                         }
                         else {
                             console.log('process admin file request');
-                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn, data: {} });
+                            const [hs, s] = yield Secure.Session.hasSession(uuid, requestIp, cookies);
+                            let sessionId = hs ? s.sessionId : '';
+                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: sessionId, isLoggedIn: isLoggedIn, data: {} });
                         }
                     }
                 }
@@ -409,7 +412,9 @@ class WebServerHelper {
                     }
                     else {
                         console.log('process root file request');
-                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn, data: {} });
+                        const [hs, s] = yield Secure.Session.hasSession(uuid, requestIp, cookies);
+                        let sessionId = hs ? s.sessionId : '';
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: sessionId, isLoggedIn: isLoggedIn, data: {} });
                     }
                 }
                 if (!resp.success) {
