@@ -433,12 +433,11 @@ class WebServerHelper {
     }
     readSettingsFile(fileName, web, uuid, requestIp, cookies) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log('reading .ejs.json');
             let loadedData = {};
             let p = new Promise(function (resolve, reject) {
                 fs.readFile(fileName, 'utf8', (error, data) => __awaiter(this, void 0, void 0, function* () {
                     if (error) {
-                        console.log('file read error');
+                        console.log('readSettingsFile: file read error');
                         console.log(error);
                         resolve(false);
                     }
@@ -447,17 +446,13 @@ class WebServerHelper {
                         for (var i = 0; i < ejsSettings.ad.length; i++) {
                             let action = ejsSettings.ad[i];
                             let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
-                            console.log('line after doing work');
                             loadedData[action] = wrd.data;
-                            console.log('data for action ' + action);
-                            console.log(loadedData[wrd.data]);
                         }
                         resolve(true);
                     }
                 }));
             });
             let b = yield p;
-            console.log('reading .ebs.json finished, ' + (b ? 'success' : 'error'));
             return loadedData;
         });
     }
@@ -481,8 +476,6 @@ class WebServerHelper {
                     renderEnvSettings.data = data;
                 }
                 let p = new Promise(function (resolve, reject) {
-                    console.log('data given to ejs file for render is ');
-                    console.log(renderEnvSettings.data);
                     ejs.renderFile(ejsRootFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (err) {
@@ -491,9 +484,7 @@ class WebServerHelper {
                                 resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
                             }
                             else {
-                                console.log('rendering root ejs');
                                 yield res.send(result);
-                                console.log('rendered root ejs');
                                 resolve(new WebResponse(true, '', `UUID:${uuid} Rendered root ejs`, ''));
                             }
                         });
@@ -508,8 +499,6 @@ class WebServerHelper {
                     renderEnvSettings.data = data;
                 }
                 let p = new Promise(function (resolve, reject) {
-                    console.log('data given to ejs file for render is ');
-                    console.log(renderEnvSettings.data);
                     ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (err) {
@@ -518,9 +507,7 @@ class WebServerHelper {
                                 resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file', `UUID:${uuid} Problem rendering ejs file`, err));
                             }
                             else {
-                                console.log('rendering ejs');
                                 yield res.send(result);
-                                console.log('rendered ejs');
                                 resolve(new WebResponse(true, '', `UUID:${uuid} Rendered ejs`, ''));
                             }
                         });

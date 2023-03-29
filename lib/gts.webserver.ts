@@ -378,12 +378,11 @@ export class WebServerHelper{
 	}
 	
 	private async readSettingsFile(fileName:string, web:WebServerHelper, uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<GTS.DM.HashTable<string>>{
-		console.log('reading .ejs.json');
 		let loadedData:GTS.DM.HashTable<string> = {};
 		let p:Promise<boolean>  = new Promise(function (resolve, reject) {
 			fs.readFile(fileName, 'utf8', async (error:string, data:string) => {
 				 if(error){
-					console.log('file read error');
+					console.log('readSettingsFile: file read error');
 					console.log(error);
 					resolve(false);
 				 } else {
@@ -391,17 +390,13 @@ export class WebServerHelper{
 					 for(var i=0; i < ejsSettings.ad.length; i++){
 						 let action:string = ejsSettings.ad[i];
 						 let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
-						 console.log('line after doing work');
 						loadedData[action]=wrd.data;
-						console.log('data for action '+action);
-						console.log(loadedData[wrd.data]);
 					 }
 					 resolve(true);
 				 }
 			});
 		});
 		let b:boolean = await p;
-		console.log('reading .ebs.json finished, '+(b?'success':'error'));
 		return loadedData;
 	}
 	
@@ -417,24 +412,18 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-			
 			if(fs.existsSync(ejsRootFile+'.json')){
 				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsRootFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
 				renderEnvSettings.data = data;
 			}
-
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-				console.log('data given to ejs file for render is ');
-				console.log(renderEnvSettings.data);
-				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
+				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
 					if( err ){
 						console.log('error rendering root ejs');
 						console.log(err);
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 					} else {
-						console.log('rendering root ejs');
 						await res.send(result);
-						console.log('rendered root ejs');
 						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,''));
 					}
 				});
@@ -447,19 +436,14 @@ export class WebServerHelper{
 				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
 				renderEnvSettings.data = data;
 			}
-			
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-				console.log('data given to ejs file for render is ');
-				console.log(renderEnvSettings.data);
-				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
+				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
 					if( err ){
 						console.log('error rendering ejs');
 						console.log(err);
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 					} else {
-						console.log('rendering ejs');
 						await res.send(result);
-						console.log('rendered ejs');
 						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
 					}
 				});
