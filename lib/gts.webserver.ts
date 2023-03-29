@@ -381,26 +381,21 @@ export class WebServerHelper{
 		console.log('reading .ejs.json');
 		let loadedData:GTS.DM.HashTable<string> = {};
 		let p:Promise<boolean>  = new Promise(function (resolve, reject) {
-			fs.readFile(fileName, 'utf8', (error:string, data:string) => {
+			fs.readFile(fileName, 'utf8', async (error:string, data:string) => {
 				 if(error){
 					console.log('file read error');
 					console.log(error);
 					resolve(false);
 				 } else {
 					 let ejsSettings:EjsSettings = JSON.parse(data);
-					 ejsSettings.ad.forEach(async function(action:string){
-						console.log('found action '+action);
-						let pGetData:Promise<WebResponse> = new Promise(async function(resolveGotData){
-							let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
-							console.log('line after doing work');
-							resolveGotData(wrd);
-						});
-						let wrData:WebResponse = await pGetData;
-						loadedData[action]=wrData.data;
+					 for(var i=0; i < ejsSettings.ad.length; i++){
+						 let action:string = ejsSettings.ad[i];
+						 let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
+						 console.log('line after doing work');
+						loadedData[action]=wrd.data;
 						console.log('data for action '+action);
-						console.log(loadedData[wrData.data]);
-						 
-					 });
+						console.log(loadedData[wrd.data]);
+					 }
 					 resolve(true);
 				 }
 			});

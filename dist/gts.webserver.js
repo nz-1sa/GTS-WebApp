@@ -436,7 +436,7 @@ class WebServerHelper {
             console.log('reading .ejs.json');
             let loadedData = {};
             let p = new Promise(function (resolve, reject) {
-                fs.readFile(fileName, 'utf8', (error, data) => {
+                fs.readFile(fileName, 'utf8', (error, data) => __awaiter(this, void 0, void 0, function* () {
                     if (error) {
                         console.log('file read error');
                         console.log(error);
@@ -444,25 +444,17 @@ class WebServerHelper {
                     }
                     else {
                         let ejsSettings = JSON.parse(data);
-                        ejsSettings.ad.forEach(function (action) {
-                            return __awaiter(this, void 0, void 0, function* () {
-                                console.log('found action ' + action);
-                                let pGetData = new Promise(function (resolveGotData) {
-                                    return __awaiter(this, void 0, void 0, function* () {
-                                        let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
-                                        console.log('line after doing work');
-                                        resolveGotData(wrd);
-                                    });
-                                });
-                                let wrData = yield pGetData;
-                                loadedData[action] = wrData.data;
-                                console.log('data for action ' + action);
-                                console.log(loadedData[wrData.data]);
-                            });
-                        });
+                        for (var i = 0; i < ejsSettings.ad.length; i++) {
+                            let action = ejsSettings.ad[i];
+                            let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
+                            console.log('line after doing work');
+                            loadedData[action] = wrd.data;
+                            console.log('data for action ' + action);
+                            console.log(loadedData[wrd.data]);
+                        }
                         resolve(true);
                     }
-                });
+                }));
             });
             let b = yield p;
             console.log('reading .ebs.json finished, ' + (b ? 'success' : 'error'));
