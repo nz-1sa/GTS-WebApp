@@ -384,12 +384,12 @@ export class WebServerHelper{
 				ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering root ejs');
-						p.resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
+						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 					} else {
 						console.log('rendering root ejs');
 						await res.send(result);
 						console.log('rendered root ejs');
-						p.resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,''));
+						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,''));
 					}
 				});
 			});
