@@ -375,17 +375,25 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
+			let resolveError:function = {};
+			let resovedRendered:function = {};
+			const pError:Promise = new Promise((resolve) =>{resolveError=resolve;});
+			const pRendered:Promise = new Promise((resolve) =>{resovedRendered=resolve;});
+			
 			ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
 					console.log('error rendering root ejs');
-					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
+					resolveError(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
 				} else {
 					console.log('rendering root ejs');
 					await res.send(result);
 					console.log('rendered root ejs');
-					return new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'');
+					resovedRendered(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,''));
 				}
 			});
+			
+			let WebResponse wr = await Promise.any([pError,pRendered]);
+			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
 			ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
