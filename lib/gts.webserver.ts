@@ -14,11 +14,11 @@ export interface IAdminHandlerFunction {
 }
 
 class RenderEnvSettings{
-	public uuid:string;
-	public requestIp:string;
-	public cookies:GTS.DM.HashTable<string>;
-	public url:string;
-	public isLoggedIn:bool;
+	public uuid:string = '';
+	public requestIp:string = '';
+	public cookies:GTS.DM.HashTable<string> = {};
+	public url:string = '';
+	public isLoggedIn:boolean = false;
 }
 
 export class WebServerHelper{
