@@ -364,6 +364,7 @@ export class WebServerHelper{
 	}
 	
 	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string):Promise<WebResponse> {
+		console.log('handleServeFile '+url);
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
 			console.log('request invalid');
