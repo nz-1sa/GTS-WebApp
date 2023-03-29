@@ -447,10 +447,17 @@ class WebServerHelper {
                         ejsSettings.ad.forEach(function (action) {
                             return __awaiter(this, void 0, void 0, function* () {
                                 console.log('found action ' + action);
-                                let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
-                                loadedData[action] = wrd.data;
+                                let pGetData = new Promise(function (resolveGotData) {
+                                    return __awaiter(this, void 0, void 0, function* () {
+                                        let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
+                                        console.log('line after doing work');
+                                        resolveGotData(wrd);
+                                    });
+                                });
+                                let wrData = yield pGetData;
+                                loadedData[action] = wrData.data;
                                 console.log('data for action ' + action);
-                                console.log(wrd.data);
+                                console.log(loadedData[wrData.data]);
                             });
                         });
                         resolve(true);

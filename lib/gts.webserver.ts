@@ -390,10 +390,15 @@ export class WebServerHelper{
 					 let ejsSettings:EjsSettings = JSON.parse(data);
 					 ejsSettings.ad.forEach(async function(action:string){
 						console.log('found action '+action);
-						let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
-						loadedData[action]=wrd.data;
+						let pGetData:Promise<WebResponse> = new Promise(async function(resolveGotData){
+							let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
+							console.log('line after doing work');
+							resolveGotData(wrd);
+						});
+						let wrData:WebResponse = await pGetData;
+						loadedData[action]=wrData.data;
 						console.log('data for action '+action);
-						console.log(wrd.data);
+						console.log(loadedData[wrData.data]);
 						 
 					 });
 					 resolve(true);
