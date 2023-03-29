@@ -377,6 +377,34 @@ export class WebServerHelper{
 		});
 	}
 	
+	private async readSettingsFile(fileName:string, web:WebServerHelper, uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>):Promise<GTS.DM.HashTable<string>>{
+		console.log('reading .ejs.json');
+		let loadedData:GTS.DM.HashTable<string> = {};
+		let p:Promise<boolean>  = new Promise(function (resolve, reject) {
+			fs.readFile(fileName, 'utf8', (error:string, data:string) => {
+				 if(error){
+					console.log('file read error');
+					console.log(error);
+					resolve(false);
+				 } else {
+					 let ejsSettings:EjsSettings = JSON.parse(data);
+					 ejsSettings.ad.forEach(async function(action:string){
+						console.log('found action '+action);
+						let wrd:WebResponse = await web.adminHandlers[action](uuid, requestIp, cookies, null);
+						loadedData[action]=wrd.data;
+						console.log('data for action '+action);
+						console.log(wrd.data);
+						 
+					 });
+					 resolve(true);
+				 }
+			});
+		});
+		let b:boolean = await p;
+		console.log('reading .ebs.json finished, '+(b?'success':'error'));
+		return loadedData;
+	}
+	
 	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string, renderEnvSettings:RenderEnvSettings):Promise<WebResponse> {
 		console.log('handleServeFile '+url);
 		// stop use of .. to traverse up the diretory tree
@@ -391,27 +419,8 @@ export class WebServerHelper{
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
 			
 			if(fs.existsSync(ejsRootFile+'.json')){
-				console.log('found .ejs.json');
-				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
-					fs.readFile(ejsRootFile+'.json', 'utf8', (error:string, data:string) => {
-						 if(error){
-							console.log('file read error');
-							console.log(error);
-							resolve(false);
-							return;
-						 }
-						 let ejsSettings:EjsSettings = JSON.parse(data);
-						 ejsSettings.ad.forEach(async function(action:string){
-							 console.log('found action '+action);
-							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-							 console.log(wrd.data);
-							 renderEnvSettings.data[action] = wrd.data;
-						 });
-						 resolve(true);
-					});
-				});
-				let b:boolean = await p;
-				console.log('reading .ebs.json finished');
+				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsRootFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
+				renderEnvSettings.data = data;
 			}
 
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
@@ -435,27 +444,8 @@ export class WebServerHelper{
 		}
 		if(fs.existsSync(ejsFile)) {
 			if(fs.existsSync(ejsFile+'.json')){
-				console.log('found .ejs.json');
-				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
-					fs.readFile(ejsFile+'.json', 'utf8', (error:string, data:string) => {
-						 if(error){
-							 console.log('file read error');
-							 console.log(error);
-							resolve(false);
-							return;
-						 }
-						 let ejsSettings:EjsSettings = JSON.parse(data);
-						 ejsSettings.ad.forEach(async function(action:string){
-							 console.log('found action '+action);
-							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-							 console.log(wrd.data);
-							 renderEnvSettings.data[action] = wrd.data;
-						 });
-						 resolve(true);
-					});
-				});
-				let b:boolean = await p;
-				console.log('reading .ebs.json finished');
+				let data: GTS.DM.HashTable<string> = await this.readSettingsFile(ejsFile+'.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
+				renderEnvSettings.data = data;
 			}
 			
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {

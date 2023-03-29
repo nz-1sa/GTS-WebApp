@@ -21,6 +21,7 @@ export declare class WebServerHelper {
     private handleRequestUnchecked;
     attachAdminFiles(web: WebServerHelper, webapp: Express.Application): void;
     attachRootFiles(web: WebServerHelper, webapp: Express.Application): void;
+    private readSettingsFile;
     private handleServeFile;
     attachWeblogsInterface(web: WebServerHelper, webapp: Express.Application): void;
     private requireTransactionHash;

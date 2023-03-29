@@ -431,6 +431,37 @@ class WebServerHelper {
             }
         }));
     }
+    readSettingsFile(fileName, web, uuid, requestIp, cookies) {
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('reading .ejs.json');
+            let loadedData = {};
+            let p = new Promise(function (resolve, reject) {
+                fs.readFile(fileName, 'utf8', (error, data) => {
+                    if (error) {
+                        console.log('file read error');
+                        console.log(error);
+                        resolve(false);
+                    }
+                    else {
+                        let ejsSettings = JSON.parse(data);
+                        ejsSettings.ad.forEach(function (action) {
+                            return __awaiter(this, void 0, void 0, function* () {
+                                console.log('found action ' + action);
+                                let wrd = yield web.adminHandlers[action](uuid, requestIp, cookies, null);
+                                loadedData[action] = wrd.data;
+                                console.log('data for action ' + action);
+                                console.log(wrd.data);
+                            });
+                        });
+                        resolve(true);
+                    }
+                });
+            });
+            let b = yield p;
+            console.log('reading .ebs.json finished, ' + (b ? 'success' : 'error'));
+            return loadedData;
+        });
+    }
     handleServeFile(web, res, url, uuid, renderEnvSettings) {
         return __awaiter(this, void 0, void 0, function* () {
             console.log('handleServeFile ' + url);
@@ -447,29 +478,8 @@ class WebServerHelper {
             let ejsRootFile = web.getFile(url + '/.ejs');
             if (fs.existsSync(ejsRootFile)) { // allow default .ejs file in a folder to be served without the trailing / on the folder name
                 if (fs.existsSync(ejsRootFile + '.json')) {
-                    console.log('found .ejs.json');
-                    let p = new Promise(function (resolve, reject) {
-                        fs.readFile(ejsRootFile + '.json', 'utf8', (error, data) => {
-                            if (error) {
-                                console.log('file read error');
-                                console.log(error);
-                                resolve(false);
-                                return;
-                            }
-                            let ejsSettings = JSON.parse(data);
-                            ejsSettings.ad.forEach(function (action) {
-                                return __awaiter(this, void 0, void 0, function* () {
-                                    console.log('found action ' + action);
-                                    let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-                                    console.log(wrd.data);
-                                    renderEnvSettings.data[action] = wrd.data;
-                                });
-                            });
-                            resolve(true);
-                        });
-                    });
-                    let b = yield p;
-                    console.log('reading .ebs.json finished');
+                    let data = yield this.readSettingsFile(ejsRootFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
+                    renderEnvSettings.data = data;
                 }
                 let p = new Promise(function (resolve, reject) {
                     console.log('data given to ejs file for render is ');
@@ -495,29 +505,8 @@ class WebServerHelper {
             }
             if (fs.existsSync(ejsFile)) {
                 if (fs.existsSync(ejsFile + '.json')) {
-                    console.log('found .ejs.json');
-                    let p = new Promise(function (resolve, reject) {
-                        fs.readFile(ejsFile + '.json', 'utf8', (error, data) => {
-                            if (error) {
-                                console.log('file read error');
-                                console.log(error);
-                                resolve(false);
-                                return;
-                            }
-                            let ejsSettings = JSON.parse(data);
-                            ejsSettings.ad.forEach(function (action) {
-                                return __awaiter(this, void 0, void 0, function* () {
-                                    console.log('found action ' + action);
-                                    let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-                                    console.log(wrd.data);
-                                    renderEnvSettings.data[action] = wrd.data;
-                                });
-                            });
-                            resolve(true);
-                        });
-                    });
-                    let b = yield p;
-                    console.log('reading .ebs.json finished');
+                    let data = yield this.readSettingsFile(ejsFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
+                    renderEnvSettings.data = data;
                 }
                 let p = new Promise(function (resolve, reject) {
                     console.log('data given to ejs file for render is ');
