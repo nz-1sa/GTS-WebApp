@@ -544,7 +544,7 @@ class WebServerHelper {
             renderEnvSettings.sessionId = yield Secure.getSessionId(renderEnvSettings.uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
             let returnCookies = [];
             // save session cookie in response if session has just been created
-            if (renderEnvSettings.cookies['session'] == undefined) {
+            if (renderEnvSettings.cookies['session'] == undefined || renderEnvSettings.cookies['session'] != renderEnvSettings.sessionId) {
                 returnCookies.push(new Cookie('session', renderEnvSettings.sessionId));
             }
             // synchronously render the file to the response. Return a WebResponse for logging and error reporting
@@ -559,7 +559,7 @@ class WebServerHelper {
                         }
                         else {
                             // send the cookies to the response
-                            if (returnCookies != undefined && returnCookies.length > 0) {
+                            if (returnCookies.length > 0) {
                                 for (var i = 0; i < returnCookies.length; i++) {
                                     let c = returnCookies[i];
                                     res.cookie(c.name, c.value, c.getOptions());

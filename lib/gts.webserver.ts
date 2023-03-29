@@ -482,7 +482,7 @@ export class WebServerHelper{
 		renderEnvSettings.sessionId = await Secure.getSessionId(renderEnvSettings.uuid,renderEnvSettings.requestIp,renderEnvSettings.cookies);
 		let returnCookies:Cookie[] = [];
 		// save session cookie in response if session has just been created
-		if(renderEnvSettings.cookies['session']==undefined){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
+		if(renderEnvSettings.cookies['session']==undefined || renderEnvSettings.cookies['session']!=renderEnvSettings.sessionId){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
 		// synchronously render the file to the response. Return a WebResponse for logging and error reporting
 		let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 			// ejs.renderFile( filename, data, options, callback
@@ -493,7 +493,7 @@ export class WebServerHelper{
 					resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err,returnCookies));
 				} else {
 					// send the cookies to the response
-					if(returnCookies != undefined && returnCookies.length > 0){
+					if(returnCookies.length > 0){
 						for(var i:number=0; i<returnCookies.length; i++){
 							let c: Cookie = returnCookies[i];
 							res.cookie(c.name, c.value, c.getOptions());
