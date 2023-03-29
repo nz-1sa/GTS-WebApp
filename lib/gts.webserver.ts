@@ -391,6 +391,7 @@ export class WebServerHelper{
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
 			
 			if(fs.existsSync(ejsRootFile+'.json')){
+				console.log('found .ejs.json');
 				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
 					fs.readFile(ejsRootFile+'.json', 'utf8', (error:string, data:string) => {
 						 if(error){
@@ -399,7 +400,9 @@ export class WebServerHelper{
 						 }
 						 let ejsSettings:EjsSettings = JSON.parse(data);
 						 ejsSettings.ad.forEach(async function(action:string){
+							 console.log('found action '+action);
 							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+							 console.log(wrd);
 							 renderEnvSettings.data[action] = wrd.data;
 						 });
 						 resolve(true);

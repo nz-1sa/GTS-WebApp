@@ -447,6 +447,7 @@ class WebServerHelper {
             let ejsRootFile = web.getFile(url + '/.ejs');
             if (fs.existsSync(ejsRootFile)) { // allow default .ejs file in a folder to be served without the trailing / on the folder name
                 if (fs.existsSync(ejsRootFile + '.json')) {
+                    console.log('found .ejs.json');
                     let p = new Promise(function (resolve, reject) {
                         fs.readFile(ejsRootFile + '.json', 'utf8', (error, data) => {
                             if (error) {
@@ -456,7 +457,9 @@ class WebServerHelper {
                             let ejsSettings = JSON.parse(data);
                             ejsSettings.ad.forEach(function (action) {
                                 return __awaiter(this, void 0, void 0, function* () {
+                                    console.log('found action ' + action);
                                     let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+                                    console.log(wrd);
                                     renderEnvSettings.data[action] = wrd.data;
                                 });
                             });
