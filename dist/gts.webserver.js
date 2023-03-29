@@ -48,6 +48,13 @@ class RenderEnvSettings {
         this.cookies = {};
         this.url = '';
         this.isLoggedIn = false;
+        this.data = {};
+    }
+}
+class EjsSettings {
+    constructor() {
+        this.ad = [];
+        this.pd = [];
     }
 }
 class WebServerHelper {
@@ -350,7 +357,7 @@ class WebServerHelper {
                         }
                         else {
                             console.log('process admin file request');
-                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn });
+                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn, data: {} });
                         }
                     }
                 }
@@ -401,7 +408,7 @@ class WebServerHelper {
                     }
                     else {
                         console.log('process root file request');
-                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn });
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, isLoggedIn: isLoggedIn, data: {} });
                     }
                 }
                 if (!resp.success) {
@@ -439,6 +446,25 @@ class WebServerHelper {
             let ejsFile = web.getFile(url + '.ejs');
             let ejsRootFile = web.getFile(url + '/.ejs');
             if (fs.existsSync(ejsRootFile)) { // allow default .ejs file in a folder to be served without the trailing / on the folder name
+                if (fs.existsSync(ejsRootFile + '.json')) {
+                    let p = new Promise(function (resolve, reject) {
+                        fs.readFile(ejsRootFile + '.json', 'utf8', (error, data) => {
+                            if (error) {
+                                resolve(false);
+                                return;
+                            }
+                            let ejsSettings = JSON.parse(data);
+                            ejsSettings.ad.forEach(function (action) {
+                                return __awaiter(this, void 0, void 0, function* () {
+                                    let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+                                    renderEnvSettings.data[action] = wrd.data;
+                                });
+                            });
+                            resolve(true);
+                        });
+                    });
+                    let b = yield p;
+                }
                 let p = new Promise(function (resolve, reject) {
                     ejs.renderFile(ejsRootFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {

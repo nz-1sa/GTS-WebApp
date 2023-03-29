@@ -312,7 +312,7 @@ export class WebServerHelper{
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
 							console.log('process admin file request');
-							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
+							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn, data:{}});
 						}
 					}
 				}
@@ -357,7 +357,7 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn, data:{}});
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
@@ -392,20 +392,20 @@ export class WebServerHelper{
 			
 			if(fs.existsSync(ejsRootFile+'.json')){
 				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
-					fs.readFile(ejsRootFile+'.json', 'utf8', (error, data) => {
+					fs.readFile(ejsRootFile+'.json', 'utf8', (error:string, data:string) => {
 						 if(error){
 							resolve(false);
 							return;
 						 }
-						 let ejsSettings:EjsSettings = JSON.parse(data));
-						 ejsSettings.ad.foreach(function(action:string){
-							 renderEnvSettings.data[action] = await web.adminHandlers[action](dbId, requestIp, cookies, params).data;
+						 let ejsSettings:EjsSettings = JSON.parse(data);
+						 ejsSettings.ad.forEach(async function(action:string){
+							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
+							 renderEnvSettings.data[action] = wrd.data;
 						 });
 						 resolve(true);
-
 					});
 				});
-				let wr:WebResponse = await p;
+				let b:boolean = await p;
 			}
 
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
