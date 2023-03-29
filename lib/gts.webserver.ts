@@ -395,6 +395,8 @@ export class WebServerHelper{
 				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
 					fs.readFile(ejsRootFile+'.json', 'utf8', (error:string, data:string) => {
 						 if(error){
+							console.log('file read error');
+							console.log(error);
 							resolve(false);
 							return;
 						 }
@@ -437,6 +439,8 @@ export class WebServerHelper{
 				let p:Promise<boolean>  = new Promise(function (resolve, reject) {
 					fs.readFile(ejsFile+'.json', 'utf8', (error:string, data:string) => {
 						 if(error){
+							 console.log('file read error');
+							 console.log(error);
 							resolve(false);
 							return;
 						 }
@@ -451,9 +455,12 @@ export class WebServerHelper{
 					});
 				});
 				let b:boolean = await p;
+				console.log('reading .ebs.json finished');
 			}
 			
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+				console.log('data given to ejs file for render is ');
+				console.log(renderEnvSettings.data);
 				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering ejs');

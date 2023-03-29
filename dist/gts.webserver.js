@@ -451,6 +451,8 @@ class WebServerHelper {
                     let p = new Promise(function (resolve, reject) {
                         fs.readFile(ejsRootFile + '.json', 'utf8', (error, data) => {
                             if (error) {
+                                console.log('file read error');
+                                console.log(error);
                                 resolve(false);
                                 return;
                             }
@@ -497,6 +499,8 @@ class WebServerHelper {
                     let p = new Promise(function (resolve, reject) {
                         fs.readFile(ejsFile + '.json', 'utf8', (error, data) => {
                             if (error) {
+                                console.log('file read error');
+                                console.log(error);
                                 resolve(false);
                                 return;
                             }
@@ -513,8 +517,11 @@ class WebServerHelper {
                         });
                     });
                     let b = yield p;
+                    console.log('reading .ebs.json finished');
                 }
                 let p = new Promise(function (resolve, reject) {
+                    console.log('data given to ejs file for render is ');
+                    console.log(renderEnvSettings.data);
                     ejs.renderFile(ejsFile, renderEnvSettings, {}, function (err, result) {
                         return __awaiter(this, void 0, void 0, function* () {
                             if (err) {
