@@ -404,7 +404,7 @@ export class WebServerHelper{
 						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
 					}
 				});
-			}
+			});
 			let wr:WebResponse = await p;
 			return wr;
 		}
