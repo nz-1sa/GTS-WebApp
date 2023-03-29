@@ -375,11 +375,6 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-			//let resolveError:Function = ()=>{ return false; };
-			//let resolveRendered:Function = ()=>{ return false; };
-			//const pError:Promise<WebResponse> = new Promise((resolve) =>{resolveError=resolve;});
-			//const pRendered:Promise<WebResponse> = new Promise((resolve) =>{resolveRendered=resolve;});
-			
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
 				ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
@@ -394,22 +389,24 @@ export class WebServerHelper{
 				});
 			});
 			let wr:WebResponse = await p;
-			//const promises = [pError,pRendered];
-			//let wr:WebResponse = await new Promise<WebResponse>(() => {}).any(promises);
 			return wr;
 		}
 		if(fs.existsSync(ejsFile)) {
-			ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
-				if( err ){
-					console.log('error rendering ejs');
-					return new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err);
-				} else {
-					console.log('rendering ejs');
-					await res.send(result);
-					console.log('rendered ejs');
-					return new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,'');
-				}
-			});
+			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
+				ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
+					if( err ){
+						console.log('error rendering ejs');
+						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
+					} else {
+						console.log('rendering ejs');
+						await res.send(result);
+						console.log('rendered ejs');
+						resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
+					}
+				});
+			}
+			let wr:WebResponse = await p;
+			return wr;
 		}
 		if(url.endsWith('.ejs')){
 			console.log('blocking server (not render) of ejs');
