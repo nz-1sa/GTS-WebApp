@@ -459,7 +459,7 @@ class WebServerHelper {
                                 return __awaiter(this, void 0, void 0, function* () {
                                     console.log('found action ' + action);
                                     let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-                                    console.log(wrd);
+                                    console.log(wrd.data);
                                     renderEnvSettings.data[action] = wrd.data;
                                 });
                             });
@@ -502,7 +502,7 @@ class WebServerHelper {
                                 return __awaiter(this, void 0, void 0, function* () {
                                     console.log('found action ' + action);
                                     let wrd = yield web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-                                    console.log(wrd);
+                                    console.log(wrd.data);
                                     renderEnvSettings.data[action] = wrd.data;
                                 });
                             });

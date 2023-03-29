@@ -402,7 +402,7 @@ export class WebServerHelper{
 						 ejsSettings.ad.forEach(async function(action:string){
 							 console.log('found action '+action);
 							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-							 console.log(wrd);
+							 console.log(wrd.data);
 							 renderEnvSettings.data[action] = wrd.data;
 						 });
 						 resolve(true);
@@ -441,7 +441,7 @@ export class WebServerHelper{
 						 ejsSettings.ad.forEach(async function(action:string){
 							 console.log('found action '+action);
 							 let wrd:WebResponse = await web.adminHandlers[action](uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies, null);
-							 console.log(wrd);
+							 console.log(wrd.data);
 							 renderEnvSettings.data[action] = wrd.data;
 						 });
 						 resolve(true);
