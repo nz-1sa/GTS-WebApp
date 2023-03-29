@@ -298,7 +298,7 @@ export class WebServerHelper{
 							resp = new WebResponse(false, 'ERROR: Invalid admin request received',`UUID:${uuid} Trying to access invalid admin file`,'');
 						}else{
 							console.log('process admin file request');
-							resp = await this.handleServeFile(web, res, url, uuid);
+							resp = await this.handleServeFile(web, res, url, uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
 						}
 					}
 				}
@@ -317,6 +317,14 @@ export class WebServerHelper{
 				web.releaseUUID(uuid);
 			}
 		});
+	}
+	
+	class RenderEnvSettings{
+		public uuid:string;
+		public requestIp:string;
+		public cookies:GTS.DM.HashTable<string>;
+		public url:string;
+		public isLoggedIn:bool;
 	}
 	
 	// attach code to serve normal website files
@@ -343,7 +351,7 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid);
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, {uuid:uuid, equestIp:requestIp, cookies:cookies, url:url, isLoggedIn:isLoggedIn});
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
@@ -363,7 +371,7 @@ export class WebServerHelper{
 		});
 	}
 	
-	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string):Promise<WebResponse> {
+	private async handleServeFile(web:WebServerHelper, res:Express.Response, url:string, uuid:string, renderEnvSettings:RenderEnvSettings):Promise<WebResponse> {
 		console.log('handleServeFile '+url);
 		// stop use of .. to traverse up the diretory tree
 		if(url.indexOf('/../')>=0){
@@ -376,7 +384,7 @@ export class WebServerHelper{
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-				ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
+				ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering root ejs');
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
@@ -393,7 +401,7 @@ export class WebServerHelper{
 		}
 		if(fs.existsSync(ejsFile)) {
 			let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-				ejs.renderFile(ejsFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
+				ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 					if( err ){
 						console.log('error rendering ejs');
 						resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
