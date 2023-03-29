@@ -375,10 +375,10 @@ export class WebServerHelper{
 		let ejsFile:string = web.getFile(url+'.ejs');
 		let ejsRootFile:string = web.getFile(url+'/.ejs');
 		if(fs.existsSync(ejsRootFile)) {	// allow default .ejs file in a folder to be served without the trailing / on the folder name
-			let resolveError:function = {};
-			let resolveRendered:function = {};
-			const pError:Promise = new Promise((resolve) =>{resolveError=resolve;});
-			const pRendered:Promise = new Promise((resolve) =>{resolveRendered=resolve;});
+			let resolveError:Function = {};
+			let resolveRendered:Function = {};
+			const pError:Promise<WebResponse> = new Promise((resolve) =>{resolveError=resolve;});
+			const pRendered:Promise<WebResponse> = new Promise((resolve) =>{resolveRendered=resolve;});
 			
 			ejs.renderFile(ejsRootFile, {}, {}, async function(err:string, result:string){	// renderFile( filename, data, options
 				if( err ){
