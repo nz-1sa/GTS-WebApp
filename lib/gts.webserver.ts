@@ -13,6 +13,14 @@ export interface IAdminHandlerFunction {
 	(uuid:string, requestIp:string, cookies:GTS.DM.HashTable<string>, params:GTS.DM.JSONValue):Promise<WebResponse>;
 }
 
+class RenderEnvSettings{
+	public uuid:string;
+	public requestIp:string;
+	public cookies:GTS.DM.HashTable<string>;
+	public url:string;
+	public isLoggedIn:bool;
+}
+
 export class WebServerHelper{
 	// store which uuids are in use
 	// each request gets an uuid
@@ -317,14 +325,6 @@ export class WebServerHelper{
 				web.releaseUUID(uuid);
 			}
 		});
-	}
-	
-	class RenderEnvSettings{
-		public uuid:string;
-		public requestIp:string;
-		public cookies:GTS.DM.HashTable<string>;
-		public url:string;
-		public isLoggedIn:bool;
 	}
 	
 	// attach code to serve normal website files
