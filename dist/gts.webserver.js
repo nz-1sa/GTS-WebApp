@@ -345,20 +345,23 @@ class WebServerHelper {
                     resp = new WebResponse(false, 'Could not generate unique uuid', '', '');
                 }
                 else {
-                    let requestIp = req.ip;
-                    let cookies = req.cookies;
-                    let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
-                    if (!isLoggedIn) {
-                        res.status(401).end();
-                        resp = new WebResponse(true, '401 Unauthorised', `UUID:${uuid} Trying to access admin without login`, '');
+                    let url = req.originalUrl.replace('\\', '/');
+                    if (!(url == '/admin' || url.startsWith('/admin/'))) {
+                        resp = new WebResponse(false, 'ERROR: Invalid admin request received', `UUID:${uuid} Trying to access invalid admin file`, '');
                     }
                     else {
-                        let url = req.originalUrl.replace('\\', '/');
-                        if (!(url == '/admin' || url.startsWith('/admin/'))) {
-                            resp = new WebResponse(false, 'ERROR: Invalid admin request received', `UUID:${uuid} Trying to access invalid admin file`, '');
+                        let requestIp = req.ip;
+                        let cookies = req.cookies;
+                        let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
+                        if (!isLoggedIn) {
+                            res.status(401);
+                            let resp401 = yield this.handleServeFile(web, res, '/admin/401', uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
+                            res.send(resp401.data);
+                            res.end();
+                            resp = new WebResponse(true, '401 Unauthorised', `UUID:${uuid} Trying to access admin without login`, '');
                         }
                         else {
-                            console.log('process admin file request');
+                            console.log('process admin file request ' + url);
                             resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
                         }
                     }
