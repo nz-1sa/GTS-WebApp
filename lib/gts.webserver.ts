@@ -311,9 +311,7 @@ export class WebServerHelper{
 						let isLoggedIn:boolean = await Secure.Session.isLoggedIn(uuid, requestIp, cookies);
 						if(!isLoggedIn){
 							res.status(401);
-							let resp401:WebResponse = await this.handleServeFile(web, res, '/admin/401', uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:'', isLoggedIn:isLoggedIn, data:{}});
-							res.send(resp401.data);
-							res.end();
+							this.handleServeFile(web, res, '/admin/401', uuid, {uuid:uuid, requestIp:requestIp, cookies:cookies, url:url, sessionId:'', isLoggedIn:isLoggedIn, data:{}});
 							resp = new WebResponse(true, '401 Unauthorised',`UUID:${uuid} Trying to access admin without login`,'');
 						} else {
 							console.log('process admin file request '+url);
