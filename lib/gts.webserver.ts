@@ -306,7 +306,9 @@ export class WebServerHelper{
 					let cookies:GTS.DM.HashTable<string> = req.cookies;
 					let isLoggedIn:boolean = await Secure.Session.isLoggedIn(uuid, requestIp, cookies);
 					if(!isLoggedIn){
-						res.status(401).end();
+						res.status(401);
+						res.send('<p>Please <a href="/login">Login</a> to use the admin</p>');
+						res.end();
 						resp = new WebResponse(true, '401 Unauthorised',`UUID:${uuid} Trying to access admin without login`,'');
 					} else {
 						let url = req.originalUrl.replace('\\','/');
