@@ -43,14 +43,15 @@ class RenderEnvSettings{
 			let fileName:string = this.wsh.getFile('res/adminInteger.ejs');
 			let p:Promise<boolean>  = new Promise(function (resolve, reject) {
 				fs.readFile(fileName, 'utf8', async (error:string, data:string) => {
-					 if(error){
+					if(error){
 						console.log('readAdminInteger: file read error');
 						console.log(error);
 						resolve(false);
-					 } else {
+					} else {
+						console.log('adminInteger template is '+data);
 						retval = await ejs.render(data,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
-						 resolve(true);
-					 }
+						resolve(true);
+					}
 				});
 			});
 			let b:boolean = await p;
