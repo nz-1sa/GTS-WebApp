@@ -59,7 +59,25 @@ class RenderEnvSettings {
         this.data = pData;
         this.wsh = pWsh;
         this.adminInteger = function (name, value, regex, min, max, options, values) {
-            return ejs.render(this.wsh.getFile('res/adminInteger.ejs'), { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
+            return __awaiter(this, void 0, void 0, function* () {
+                let retval = '';
+                let fileName = this.wsh.getFile('res/adminInteger.ejs');
+                let p = new Promise(function (resolve, reject) {
+                    fs.readFile(fileName, 'utf8', (error, data) => __awaiter(this, void 0, void 0, function* () {
+                        if (error) {
+                            console.log('readAdminInteger: file read error');
+                            console.log(error);
+                            resolve(false);
+                        }
+                        else {
+                            retval = ejs.render(data, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
+                            resolve(true);
+                        }
+                    }));
+                });
+                let b = yield p;
+                return retval;
+            });
         };
         this.adminStringList = function (name, value, regex, min, max, options, values) {
             return "StringList Admin";
