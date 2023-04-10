@@ -60,6 +60,21 @@ class RenderEnvSettings {
         this.adminInteger = function (name, value, regex, min, max, options, values) {
             return "Integer Admin";
         };
+        this.adminStringList = function (name, value, regex, min, max, options, values) {
+            return "StringList Admin";
+        };
+        this.adminEnum = function (name, value, regex, min, max, options, values) {
+            return "Enum Admin";
+        };
+        this.adminDateOnly = function (name, value, regex, min, max, options, values) {
+            return "DateOnly Admin";
+        };
+        this.adminDateTime = function (name, value, regex, min, max, options, values) {
+            return "DateTime Admin";
+        };
+        this.adminString = function (name, value, regex, min, max, options, values) {
+            return "String Admin";
+        };
     }
 }
 class EjsSettings {

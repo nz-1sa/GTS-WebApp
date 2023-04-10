@@ -22,6 +22,12 @@ class RenderEnvSettings{
 	public isLoggedIn:boolean = false;
 	public data:GTS.DM.HashTable<string> = {};
 	public adminInteger:Function;
+	public adminStringList:Function;
+	public adminEnum:Function;
+	public adminDateOnly:Function;
+	public adminDateTime:Function;
+	public adminString:Function;
+	
 	public constructor(pUuid:string, pRequestIp:string, pCookies:GTS.DM.HashTable<string>, pUrl:string, pSessionId:string, pIsLoggedIn:boolean, pData:GTS.DM.HashTable<string>){
 		this.uuid = pUuid;
 		this.requestIp = pRequestIp;
@@ -33,6 +39,21 @@ class RenderEnvSettings{
 		this.adminInteger = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
 			return "Integer Admin";
 		};
+		this.adminStringList = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			return "StringList Admin";
+		};
+		this.adminEnum = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			return "Enum Admin";
+		}
+		this.adminDateOnly = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			return "DateOnly Admin";
+		}
+		this.adminDateTime = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			return "DateTime Admin";
+		}
+		this.adminString = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			return "String Admin";
+		}
 	}
 }
 
