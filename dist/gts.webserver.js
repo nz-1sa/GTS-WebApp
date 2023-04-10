@@ -42,7 +42,7 @@ const PATH = require('path');
 const ejs = require('ejs');
 const fs = require('fs');
 class RenderEnvSettings {
-    constructor() {
+    constructor(pUuid, pRequestIp, pCookies, pUrl, pSessionId, pIsLoggedIn, pData) {
         this.uuid = '';
         this.requestIp = '';
         this.cookies = {};
@@ -50,6 +50,16 @@ class RenderEnvSettings {
         this.sessionId = '';
         this.isLoggedIn = false;
         this.data = {};
+        this.uuid = pUuid;
+        this.requestIp = pRequestIp;
+        this.cookies = pCookies;
+        this.url = pUrl;
+        this.sessionId = pSessionId;
+        this.isLoggedIn = pIsLoggedIn;
+        this.data = pData;
+        this.adminInteger = function (name, value, regex, min, max, options, values) {
+            return "Integer Admin";
+        };
     }
 }
 class EjsSettings {
@@ -355,14 +365,12 @@ class WebServerHelper {
                         let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
                         if (!isLoggedIn) {
                             res.status(401);
-                            let resp401 = yield this.handleServeFile(web, res, '/admin/401', uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
-                            res.send(resp401.data);
-                            res.end();
+                            this.handleServeFile(web, res, '/admin/401', uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                             resp = new WebResponse(true, '401 Unauthorised', `UUID:${uuid} Trying to access admin without login`, '');
                         }
                         else {
                             console.log('process admin file request ' + url);
-                            resp = yield this.handleServeFile(web, res, url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
+                            resp = yield this.handleServeFile(web, res, url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                         }
                     }
                 }
@@ -413,7 +421,7 @@ class WebServerHelper {
                     }
                     else {
                         console.log('process root file request');
-                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, { uuid: uuid, requestIp: requestIp, cookies: cookies, url: url, sessionId: '', isLoggedIn: isLoggedIn, data: {} });
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                     }
                 }
                 if (!resp.success) {
@@ -480,27 +488,6 @@ class WebServerHelper {
                     let data = yield this.readSettingsFile(ejsRootFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
                     renderEnvSettings.data = data;
                 }
-                /*renderEnvSettings.sessionId = await Secure.getSessionId(uuid,renderEnvSettings.requestIp,renderEnvSettings.cookies);
-                let returnCookies:Cookie[] = [];
-                if(renderEnvSettings.cookies['session']==undefined){returnCookies.push(new Cookie('session',renderEnvSettings.sessionId));}
-                let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-                    ejs.renderFile(ejsRootFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
-                        if( err ){
-                            console.log('error rendering root ejs');
-                            console.log(err);
-                            resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err,returnCookies));
-                        } else {
-                            if(returnCookies != undefined && returnCookies.length > 0){
-                                for(var i:number=0; i<returnCookies.length; i++){
-                                    let c: Cookie = returnCookies[i];
-                                    res.cookie(c.name, c.value, c.getOptions());
-                                }
-                            }
-                            await res.send(result);
-                            resolve(new WebResponse(true, '',`UUID:${uuid} Rendered root ejs`,'',returnCookies));
-                        }
-                    });
-                }); */
                 let wr = yield this.serveEjsFile(uuid, res, ejsRootFile, renderEnvSettings);
                 return wr;
             }
@@ -509,23 +496,11 @@ class WebServerHelper {
                     let data = yield this.readSettingsFile(ejsFile + '.json', web, uuid, renderEnvSettings.requestIp, renderEnvSettings.cookies);
                     renderEnvSettings.data = data;
                 }
-                /*let p:Promise<WebResponse>  = new Promise(function (resolve, reject) {
-                    ejs.renderFile(ejsFile, renderEnvSettings, {}, async function(err:string, result:string){	// renderFile( filename, data, options, callback
-                        if( err ){
-                            console.log('error rendering ejs');
-                            console.log(err);
-                            resolve(new WebResponse(false, 'ERROR: Problem rendering ejs file',`UUID:${uuid} Problem rendering ejs file`,err));
-                        } else {
-                            await res.send(result);
-                            resolve(new WebResponse(true, '',`UUID:${uuid} Rendered ejs`,''));
-                        }
-                    });
-                });*/
                 let wr = yield this.serveEjsFile(uuid, res, ejsFile, renderEnvSettings);
                 return wr;
             }
             if (url.endsWith('.ejs')) {
-                console.log('blocking server (not render) of ejs');
+                console.log('blocking serve (not render) of ejs');
                 return new WebResponse(false, 'ERROR: Problem serving ejs file', `UUID:${uuid} Will not serve un-rendered ejs files`, url);
             }
             else if (fs.existsSync(web.getFile(url))) {
