@@ -42,7 +42,7 @@ const PATH = require('path');
 const ejs = require('ejs');
 const fs = require('fs');
 class RenderEnvSettings {
-    constructor(pUuid, pRequestIp, pCookies, pUrl, pSessionId, pIsLoggedIn, pData) {
+    constructor(pWsh, pUuid, pRequestIp, pCookies, pUrl, pSessionId, pIsLoggedIn, pData) {
         this.uuid = '';
         this.requestIp = '';
         this.cookies = {};
@@ -57,8 +57,9 @@ class RenderEnvSettings {
         this.sessionId = pSessionId;
         this.isLoggedIn = pIsLoggedIn;
         this.data = pData;
+        this.wsh = pWsh;
         this.adminInteger = function (name, value, regex, min, max, options, values) {
-            return ejs.render('@@EMBED1L res_adminInteger.ejs@@', { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
+            return ejs.render(this.wsh.getFile('res/adminInteger.ejs'), { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminStringList = function (name, value, regex, min, max, options, values) {
             return "StringList Admin";
@@ -380,12 +381,12 @@ class WebServerHelper {
                         let isLoggedIn = yield Secure.Session.isLoggedIn(uuid, requestIp, cookies);
                         if (!isLoggedIn) {
                             res.status(401);
-                            this.handleServeFile(web, res, '/admin/401', uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+                            this.handleServeFile(web, res, '/admin/401', uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                             resp = new WebResponse(true, '401 Unauthorised', `UUID:${uuid} Trying to access admin without login`, '');
                         }
                         else {
                             console.log('process admin file request ' + url);
-                            resp = yield this.handleServeFile(web, res, url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+                            resp = yield this.handleServeFile(web, res, url, uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                         }
                     }
                 }
@@ -436,7 +437,7 @@ class WebServerHelper {
                     }
                     else {
                         console.log('process root file request');
-                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+                        resp = yield this.handleServeFile(web, res, '/public' + url, uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
                     }
                 }
                 if (!resp.success) {

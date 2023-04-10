@@ -21,6 +21,7 @@ class RenderEnvSettings{
 	public sessionId:string = '';
 	public isLoggedIn:boolean = false;
 	public data:GTS.DM.HashTable<string> = {};
+	private wsh:WebServerHelper
 	public adminInteger:Function;
 	public adminStringList:Function;
 	public adminEnum:Function;
@@ -28,7 +29,7 @@ class RenderEnvSettings{
 	public adminDateTime:Function;
 	public adminString:Function;
 	
-	public constructor(pUuid:string, pRequestIp:string, pCookies:GTS.DM.HashTable<string>, pUrl:string, pSessionId:string, pIsLoggedIn:boolean, pData:GTS.DM.HashTable<string>){
+	public constructor(pWsh:WebServerHelper, pUuid:string, pRequestIp:string, pCookies:GTS.DM.HashTable<string>, pUrl:string, pSessionId:string, pIsLoggedIn:boolean, pData:GTS.DM.HashTable<string>){
 		this.uuid = pUuid;
 		this.requestIp = pRequestIp;
 		this.cookies = pCookies;
@@ -36,8 +37,9 @@ class RenderEnvSettings{
 		this.sessionId = pSessionId;
 		this.isLoggedIn = pIsLoggedIn;
 		this.data = pData;
+		this.wsh = pWsh;
 		this.adminInteger = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
-			return ejs.render('@@EMBED1L res_adminInteger.ejs@@',{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
+			return ejs.render(this.wsh.getFile('res/adminInteger.ejs'),{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
 		};
 		this.adminStringList = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
 			return "StringList Admin";
@@ -345,11 +347,11 @@ export class WebServerHelper{
 						let isLoggedIn:boolean = await Secure.Session.isLoggedIn(uuid, requestIp, cookies);
 						if(!isLoggedIn){
 							res.status(401);
-							this.handleServeFile(web, res, '/admin/401', uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+							this.handleServeFile(web, res, '/admin/401', uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
 							resp = new WebResponse(true, '401 Unauthorised',`UUID:${uuid} Trying to access admin without login`,'');
 						} else {
 							console.log('process admin file request '+url);
-							resp = await this.handleServeFile(web, res, url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+							resp = await this.handleServeFile(web, res, url, uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
 						}
 					}
 				}
@@ -394,7 +396,7 @@ export class WebServerHelper{
 						resp = new WebResponse(false, 'ERROR: Invalid request received',`UUID:${uuid} Trying to access api from rootFiles handler`,'');
 					}else{
 						console.log('process root file request');
-						resp = await this.handleServeFile(web, res, '/public'+url, uuid, new RenderEnvSettings(uuid, requestIp, cookies, url, '', isLoggedIn, {}));
+						resp = await this.handleServeFile(web, res, '/public'+url, uuid, new RenderEnvSettings(this, uuid, requestIp, cookies, url, '', isLoggedIn, {}));
 					}
 				}
 				if(!resp.success){ console.log('sending root message'); res.send(resp.toString()); }
