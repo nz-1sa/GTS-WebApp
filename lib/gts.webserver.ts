@@ -48,7 +48,7 @@ class RenderEnvSettings{
 						console.log(error);
 						resolve(false);
 					 } else {
-						retval = ejs.render(data,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
+						retval = await ejs.render(data,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
 						 resolve(true);
 					 }
 				});
