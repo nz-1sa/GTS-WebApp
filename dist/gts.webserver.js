@@ -60,7 +60,6 @@ class RenderEnvSettings {
         this.wsh = pWsh;
         this.adminInteger = function (name, value, regex, min, max, options, values) {
             return __awaiter(this, void 0, void 0, function* () {
-                let retval = '';
                 let fileName = this.wsh.getFile('res/adminInteger.ejs');
                 let p = new Promise(function (resolve, reject) {
                     // ejs.renderFile( filename, data, options, callback
@@ -69,16 +68,14 @@ class RenderEnvSettings {
                             if (err) {
                                 console.log('readAdminInteger: render error');
                                 console.log(err);
-                                resolve(false);
+                                resolve('');
                             }
                             console.log('adminInteger admin is ' + result);
-                            retval = result;
-                            resolve(true);
+                            resolve(result);
                         });
                     });
                 });
-                let b = yield p;
-                return retval;
+                return yield p;
             });
         };
         this.adminStringList = function (name, value, regex, min, max, options, values) {
