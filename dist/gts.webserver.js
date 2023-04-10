@@ -58,7 +58,7 @@ class RenderEnvSettings {
         this.isLoggedIn = pIsLoggedIn;
         this.data = pData;
         this.adminInteger = function (name, value, regex, min, max, options, values) {
-            return "Integer Admin";
+            return ejs.render('@@EMBED1L res_adminInteger.ejs@@', { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminStringList = function (name, value, regex, min, max, options, values) {
             return "StringList Admin";
