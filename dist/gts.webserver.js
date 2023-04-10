@@ -70,8 +70,19 @@ class RenderEnvSettings {
                             resolve(false);
                         }
                         else {
-                            retval = ejs.render(data, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
-                            resolve(true);
+                            // ejs.renderFile( filename, data, options, callback
+                            ejs.renderFile(data, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values }, {}, function (err, result) {
+                                return __awaiter(this, void 0, void 0, function* () {
+                                    if (err) {
+                                        console.log('readAdminInteger: render error');
+                                        console.log(err);
+                                        resolve(false);
+                                    }
+                                    console.log('adminInteger admin is ' + result);
+                                    retval = result;
+                                    resolve(true);
+                                });
+                            });
                         }
                     }));
                 });

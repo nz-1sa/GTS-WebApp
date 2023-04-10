@@ -48,9 +48,17 @@ class RenderEnvSettings{
 						console.log(error);
 						resolve(false);
 					} else {
-						console.log('adminInteger template is '+data);
-						retval = await ejs.render(data,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
-						resolve(true);
+						// ejs.renderFile( filename, data, options, callback
+						ejs.renderFile(data, {name:name, value:value, regex:regex, min:min, max:max, options:options, values:values}, {}, async function(err:string, result:string){
+							if(err){
+								console.log('readAdminInteger: render error');
+								console.log(err);
+								resolve(false);
+							}
+							console.log('adminInteger admin is '+result);
+							retval = result;
+							resolve(true);
+						});
 					}
 				});
 			});
