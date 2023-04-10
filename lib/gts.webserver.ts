@@ -38,8 +38,11 @@ class RenderEnvSettings{
 		this.isLoggedIn = pIsLoggedIn;
 		this.data = pData;
 		this.wsh = pWsh;
-		this.adminInteger = async function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+		this.adminInteger = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
 			let fileName:string = this.wsh.getFile('res/adminInteger.ejs');
+			let template:string = fs.readFileSync(fileName, 'utf-8');
+			return ejs.render(template,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
+			/*
 			let p:Promise<string>  = new Promise(function (resolve, reject) {
 				// ejs.renderFile( filename, data, options, callback
 				ejs.renderFile(fileName, {name:name, value:value, regex:regex, min:min, max:max, options:options, values:values}, {}, async function(err:string, result:string){
@@ -52,7 +55,7 @@ class RenderEnvSettings{
 					resolve(result);
 				});
 			});
-			return await p;
+			return await p;*/
 		};
 		this.adminStringList = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
 			return "StringList Admin";
