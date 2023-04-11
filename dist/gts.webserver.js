@@ -62,35 +62,31 @@ class RenderEnvSettings {
             let fileName = this.wsh.getFile('res/adminInteger.ejs');
             let template = fs.readFileSync(fileName, 'utf-8');
             return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
-            /*
-            let p:Promise<string>  = new Promise(function (resolve, reject) {
-                // ejs.renderFile( filename, data, options, callback
-                ejs.renderFile(fileName, {name:name, value:value, regex:regex, min:min, max:max, options:options, values:values}, {}, async function(err:string, result:string){
-                    if(err){
-                        console.log('readAdminInteger: render error');
-                        console.log(err);
-                        resolve('');
-                    }
-                    console.log('adminInteger admin is '+result);
-                    resolve(result);
-                });
-            });
-            return await p;*/
         };
         this.adminStringList = function (name, value, regex, min, max, options, values) {
-            return "StringList Admin";
+            let fileName = this.wsh.getFile('res/adminStringList.ejs');
+            let template = fs.readFileSync(fileName, 'utf-8');
+            return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminEnum = function (name, value, regex, min, max, options, values) {
-            return "Enum Admin";
+            let fileName = this.wsh.getFile('res/adminEnum.ejs');
+            let template = fs.readFileSync(fileName, 'utf-8');
+            return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminDateOnly = function (name, value, regex, min, max, options, values) {
-            return "DateOnly Admin";
+            let fileName = this.wsh.getFile('res/adminDateOnly.ejs');
+            let template = fs.readFileSync(fileName, 'utf-8');
+            return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminDateTime = function (name, value, regex, min, max, options, values) {
-            return "DateTime Admin";
+            let fileName = this.wsh.getFile('res/adminDateTime.ejs');
+            let template = fs.readFileSync(fileName, 'utf-8');
+            return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
         this.adminString = function (name, value, regex, min, max, options, values) {
-            return "String Admin";
+            let fileName = this.wsh.getFile('res/adminString.ejs');
+            let template = fs.readFileSync(fileName, 'utf-8');
+            return ejs.render(template, { name: name, value: value, regex: regex, min: min, max: max, options: options, values: values });
         };
     }
 }
