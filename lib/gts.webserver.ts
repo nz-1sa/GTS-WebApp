@@ -23,6 +23,7 @@ class RenderEnvSettings{
 	public data:GTS.DM.HashTable<string> = {};
 	private wsh:WebServerHelper
 	public adminInteger:Function;
+	public adminDecimal:Function;
 	public adminStringList:Function;
 	public adminEnum:Function;
 	public adminDateOnly:Function;
@@ -40,6 +41,11 @@ class RenderEnvSettings{
 		this.wsh = pWsh;
 		this.adminInteger = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
 			let fileName:string = this.wsh.getFile('res/adminInteger.ejs');
+			let template:string = fs.readFileSync(fileName, 'utf-8');
+			return ejs.render(template,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
+		};
+		this.adminDecimal = function(name:string, value:string, regex:string, min:string, max:string, options:string[], values:string[]){
+			let fileName:string = this.wsh.getFile('res/adminDecimal.ejs');
 			let template:string = fs.readFileSync(fileName, 'utf-8');
 			return ejs.render(template,{name:name, value:value, regex:regex, min:min, max:max, options:options, values:values});
 		};
